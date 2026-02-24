@@ -42,6 +42,19 @@ Creates copies of template files and opens them all in one go. There is a short 
 
 Combines WSS disbursement report files - each one sheet - into one large workbook. This relies on the assumption that they were downloaded in a specific order. After this runs, the file is ready for the Format Disb excelscript above.
 
+### Auto Downloader - PowerShell
+
+Downloads attachments from emails in a specific Outlook folder and sorts them into their appropriate places on the file system. Used to set up Auto WSS.
+
+### Auto WSS - PowerShell
+
+Combines and processes WSS disbursement report and credit card report files, then generates the relevant csvs, names and moves the processed/formatted files to their appropriate folders, and cleans up the download folders used by Auto Downloader. A combination of WSS Format Disb, WSS Format Upload, and a number of previously-manual steps.
+
+### WSS Full Starter - PowerShell
+
+Uses Get-Date and an external resource file to keep track of where files should go and what they should be named, then runs several scripts to automatically do what can be automated, and set up and open files for what currently can't. It then logs each time it runs. Capable of throwing a custom exception if it's run outside of expected conditions.
+It used to rely on user input and self-edit rather than use an external resource file; these sections are commented out in case I want to reference them in a later project.
+
 ### ahk manager - AutoHotkey
 
 Helpful script to save bits of effort here and there. Features include:
