@@ -34,6 +34,22 @@ Once transaction data has been manually added to the output of the previous scri
 
 Combines a number of similarly-named csv files into one file, for easier uploading. These files often need to be uploaded in batches, but the uploader only accepts one file per submission, so this saves time and mouse travel distance.
 
+### Auto Downloader - PowerShell
+
+Downloads attachments from emails in a specific Outlook folder and sorts them into their appropriate places on the file system. Used to set up Auto WSS.
+
+### Auto Monthly - PowerShell
+
+With a supplied generated report file and user-specified date range: filters, divides, sums, sorts, and summarizes reports to be easily copied into a template workbook and referenced. Also copies out "refund" transactions to a dedicated sheet, since those, tragically, must be manually entered.
+
+### Auto ParkWhiz - PowerShell
+
+Takes in a report file, divides and edits reports as instructed, then outputs a file containing the divided, edited reports, a summary page, and a page of errors to be manually handled. Also references a station list to create the summary, and turns the lookup table into a hashtable to decrease lookup time by a factor of ~30.
+
+### Auto WSS - PowerShell
+
+Combines and processes WSS disbursement report and credit card report files, then generates the relevant csvs, names and moves the processed/formatted files to their appropriate folders, and cleans up the download folders used by Auto Downloader. A combination of WSS Format Disb, WSS Format Upload, and a number of previously-manual steps.
+
 ### WSS create and open - PowerShell
 
 Creates copies of template files and opens them all in one go. There is a short delay between each opening to avoid "Excel cannot open a file while a dialog box is open" errors caused by the computer being slow to load each file. It used to have to be much longer before an upgrade.
@@ -41,14 +57,6 @@ Creates copies of template files and opens them all in one go. There is a short 
 ### WSS Disb Combine - PowerShell
 
 Combines WSS disbursement report files - each one sheet - into one large workbook. This relies on the assumption that they were downloaded in a specific order. After this runs, the file is ready for the Format Disb excelscript above.
-
-### Auto Downloader - PowerShell
-
-Downloads attachments from emails in a specific Outlook folder and sorts them into their appropriate places on the file system. Used to set up Auto WSS.
-
-### Auto WSS - PowerShell
-
-Combines and processes WSS disbursement report and credit card report files, then generates the relevant csvs, names and moves the processed/formatted files to their appropriate folders, and cleans up the download folders used by Auto Downloader. A combination of WSS Format Disb, WSS Format Upload, and a number of previously-manual steps.
 
 ### WSS Full Starter - PowerShell
 
