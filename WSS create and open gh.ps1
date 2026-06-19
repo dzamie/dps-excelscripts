@@ -1,10 +1,12 @@
 param(
-  [string]$userdate = "overwrite",
-  [string]$monthNumber = "02",
-  [string]$yearNumber = "2026"
+  [string]$userdate = "overwrite"
 )
 # ^asks for user input when run alone, but not when called from another script with argument
-# month/year must be changed manually for running alone
+
+$date = Get-Date
+$monthNumber = $date.toString("MM")
+$monthName = $date.toString("MMMM")
+$year = $date.toString("yyyy")
 
 # note: as of 02.12, this no longer does wss, only emf
 
@@ -15,25 +17,25 @@ function logThing {
 }
 try {
 
-$excelDelay = 2
+$excelDelay = 1
 
-$yearNumber = $yearNumber.substring(2,2)
-$months = @{
- "01" = "January"
- "02" = "February"
- "03" = "March"
- "04" = "April"
- "05" = "May"
- "06" = "June"
- "07" = "July"
- "08" = "August"
- "09" = "September"
- "10" = "October"
- "11" = "November"
- "12" = "December"
-}
-$monthName = $months[$monthNumber]
-$monthFolder = "[MONTHLY FOLDER PATH]"
+# $yearNumber = $yearNumber.substring(2,2)
+# $months = @{
+#  "01" = "January"
+#  "02" = "February"
+#  "03" = "March"
+#  "04" = "April"
+#  "05" = "May"
+#  "06" = "June"
+#  "07" = "July"
+#  "08" = "August"
+#  "09" = "September"
+#  "10" = "October"
+#  "11" = "November"
+#  "12" = "December"
+# }
+# $monthName = $months[$monthNumber]
+$monthFolder = "[VAULT PATH]\${year}\${monthNumber}.${year}"
 
 $locs = @(
   @{"name" = "Spokane"
@@ -58,16 +60,16 @@ $locs = @(
 # Copy-Item can take param hashtable: Path, Destination
 
 if($userdate -eq "overwrite") {
-  $userdate = Read-Host "Please enter date/date range"
+  $userdate = Read-Host "Please enter FULL date/date range (mm.dd.yy)"
 
-  $dotcount = ([regex]::matches($userdate, "\.")).count
-  if($dotcount -eq 0) { # same month
-    $fulldate = "${monthNumber}.${userdate}.${yearNumber}"
-  } elseif($dotcount -eq 2) { # different month
-    $fulldate = "${userdate}.${yearNumber}"
-  } else { # different year
-    $fulldate = $userdate
-  }
+#  $dotcount = ([regex]::matches($userdate, "\.")).count
+#  if($dotcount -eq 0) { # same month
+#    $fulldate = "${monthNumber}.${userdate}.${yearNumber}"
+#  } elseif($dotcount -eq 2) { # different month
+#    $fulldate = "${userdate}.${yearNumber}"
+#  } else { # different year
+#    $fulldate = $userdate
+#  }
 } else { # full starter already does this
   $fulldate = $userdate
 }
@@ -77,7 +79,7 @@ if($userdate -eq "overwrite") {
 for($i = 0; $i -lt 3; $i++) {
   $baseDir = "${monthFolder}\$($locs[$i]["base"])"
   # open EMF log
-  Invoke-Item "${baseDir}\$($locs[$i]["name"]) ${monthName} EMF 20${yearNumber}.xlsx"
+  Invoke-Item "${baseDir}\$($locs[$i]["name"]) ${monthName} EMF ${year}.xlsx"
 
   # EMF JE
   $copyFolder = "${baseDir}\$($locs[$i]["emf"])"
