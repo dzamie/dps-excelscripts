@@ -2,7 +2,8 @@ $testmode = $false
 
 function Test-Out {
   param([String] $message)
-  if($testmode) { Write-Output $message }
+#  if($testmode) { Write-Output $message }
+  Write-Output $message # these are nice to see even when not testing
 }
 
 # Sorts, filters, and sums transactions akin to manual processing
@@ -18,12 +19,6 @@ function Test-Out {
 # sum each group's Amount
 # highlight (Sale sum - Refund sum) per-spreedly/company
 
-if($testmode) {
-  $infile = Get-Item "[TEST FILE PATH]"
-} else {
-  $infile = Get-Item (Read-Host "Drag in Transaction file").Replace('"', '')
-}
-
 $companyFile = "[STATION/COMPANY REF PATH]"
 Test-Out "Importing Station list..."
 $colist = Import-Excel $companyFile -EndColumn 3
@@ -33,6 +28,12 @@ $colist | ForEach-Object {
   $colookup[[String]$_."AS400 Station ID"] = [String]$_."Company"
 }
 Test-Out "Lookup created."
+
+if($testmode) {
+  $infile = Get-Item "[TEST FILE PATH]"
+} else {
+  $infile = Get-Item (Read-Host "Drag in Transaction file").Replace('"', '')
+}
 
 # get date range, to handle single vs multi-day reports
 # accepts single dates as well, to cut down on typing
@@ -142,7 +143,7 @@ foreach($key in $keylist) {
 
 # output plan: summary sheet with $recordsums, (refund sheet with all date online refunds grouped together?), copy/paste sheets with $outrecords
 
-$outfile = $infile.PSParentPath + "\auto.xlsx"
+$outfile = $infile.PSParentPath + "\auto monthly.xlsx"
 if(Test-Path $outfile) {
   Remove-Item $outfile # avoid weird overlaps, since this makes and names new tabs each time
 }

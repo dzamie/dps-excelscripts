@@ -177,7 +177,10 @@ foreach($key in $totalcheck.Keys) {
     }
 }
 
-$outfile = $infile.PSParentPath + "\auto.xlsx"
+$outfile = $infile.PSParentPath + "\auto pw.xlsx"
+if(Test-Path $outfile) {
+  Remove-Item $outfile # avoid weird overlaps, since apparently it doesn't completely overwrite all the time
+}
 
 $cali | Export-Excel $outfile -WorksheetName "CA"
 $noncali | Export-Excel $outfile -WorksheetName "Non-CA"
