@@ -68,7 +68,7 @@ It used to rely on user input and self-edit rather than use an external resource
 Helpful script to save bits of effort here and there. Features include:
 * remaps the Dedicated Copilot Key (ugh) back to the context menu it used to be on better keyboards
 * remaps predictable, repetitive mouseclicks during my many, *many* csv uploads to simple taps of the numpad+ key
-* automates a long series of mouseclicks, alt-tabs, and copy/pastes for grabbing PBP DPS MOR reports, using pixel recognition for timing, turning an attention-intensive, half-hour task into a 10-minute task that runs by itself. No longer used as of Nov. 2025.
+* remaps filling out predictable forms, taking screenshots, and saving screenshots, for check refunds to simple taps of the numpad+ key, and adds a "jump to step" dialog box on alt+numpad+
 * maps common strings for permit refunds to simple key combinations, saving hundreds - and sometimes thousands - of keypresses a day
 
 ### AutoMail - Visual Basic
