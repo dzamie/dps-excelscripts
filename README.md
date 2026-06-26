@@ -1,6 +1,6 @@
 # Purpose
 
-In case I want to refer to my previous code, or my office's cloud goes down, having a backup is always nice. This readme contains brief descriptions of each script. They're not all ExcelScript, but most of them are. Powershell scripts have base filepaths dummied out - it's hardly infallible security, but I might as well put in at least a token effort.
+In case I want to refer to my previous code, or my office's cloud goes down, having a backup is always nice. This readme contains brief descriptions of each script. They're not all ExcelScript, but many of them are. Scripts have base filepaths and easily-identifiable information dummied out - it's hardly infallible security, but I might as well put in at least a token effort.
 
 ### Auto PBP - ExcelScript
 
