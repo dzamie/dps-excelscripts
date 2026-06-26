@@ -30,10 +30,6 @@ Sorts, groups, and reformats a (usually) multi-sheet workbook of WSS disbursemen
 
 Once transaction data has been manually added to the output of the previous script, this gathers the combined data into a summary and drops it into blocks on a new sheet, for easy copying into a csv template. It also moves the cursor to the top-left cell of the first block, for a small save in time and effort.
 
-### CSV ANCH Combine - PowerShell
-
-Combines a number of similarly-named csv files into one file, for easier uploading. These files often need to be uploaded in batches, but the uploader only accepts one file per submission, so this saves time and mouse travel distance.
-
 ### Auto Downloader - PowerShell
 
 Downloads attachments from emails in a specific Outlook folder and sorts them into their appropriate places on the file system. Used to set up Auto WSS.
@@ -49,6 +45,10 @@ Takes in a report file, divides and edits reports as instructed, then outputs a 
 ### Auto WSS - PowerShell
 
 Combines and processes WSS disbursement report and credit card report files, then generates the relevant csvs, names and moves the processed/formatted files to their appropriate folders, and cleans up the download folders used by Auto Downloader. A combination of WSS Format Disb, WSS Format Upload, and a number of previously-manual steps.
+
+### CSV ANCH Combine - PowerShell
+
+Combines a number of similarly-named csv files into one file, for easier uploading. These files often need to be uploaded in batches, but the uploader only accepts one file per submission, so this saves time and mouse travel distance.
 
 ### WSS create and open - PowerShell
 
@@ -70,3 +70,7 @@ Helpful script to save bits of effort here and there. Features include:
 * remaps predictable, repetitive mouseclicks during my many, *many* csv uploads to simple taps of the numpad+ key
 * automates a long series of mouseclicks, alt-tabs, and copy/pastes for grabbing PBP DPS MOR reports, using pixel recognition for timing, turning an attention-intensive, half-hour task into a 10-minute task that runs by itself. No longer used as of Nov. 2025.
 * maps common strings for permit refunds to simple key combinations, saving hundreds - and sometimes thousands - of keypresses a day
+
+### AutoMail - Visual Basic
+
+Simple email template that lets me set a date to include in it. Used for sending bank sheets, sets up a good bit faster than copy/pasting from Sent Items, and requires less mouse precision/ctrl+arrows to fix the dates. Easily adapted to similar but different emails: just change the recipients and body. Still need to attach and send by hand, but it's honestly easier and faster to use the "recent files" part of Outlook's Attach File dropdown, and sending by hand lets me double-check in case something goes wrong.
