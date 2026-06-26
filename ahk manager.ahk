@@ -2,27 +2,6 @@
 
 F23::AppsKey
 
-/*
-global ClicksEaten := 0
-
-!^LButton::Click "Right"
-RButton:: {
-  global
-  ClicksEaten += 1
-  return
-}
-^RButton::{
-  global
-  ClicksEaten += 1
-  return
-}
-+RButton::{
-  global
-  ClicksEaten += 1
-  return
-}
-*/
-
 ^NumpadAdd:: {
   ; Display choice box
   global
@@ -32,34 +11,27 @@ RButton:: {
 CoordMode "Mouse", "Screen"
 CoordMode "Pixel", "Screen"
 global StepCt := 1
-; Anch, Bend, Boise, Eug, Hon, Kon, Mont, Ore, SLC
-global Cities := [348, 435, 476, 510, 558, 600, 725, 813, 855]
-global CityIndex := 1
-global MorFound := false
 global ActiveFlag := 0
+global MyGui
+global StepGui
+global InVars
 
 Csv_Active(Button, Info) {
   global
-  if(ActiveFlag & 2 > 0) {
-    PPt_Off(0)
-  } else if(ActiveFlag & 4 > 0) {
-    Mor_Off(0)
-  }
+  All_Off(0)
   ActiveFlag |= 1
   StepCt := 1
   Hotkey "NumpadAdd", Csv_Next, "On"
+  Hotkey "+NumpadAdd", Csv_416, "On"
   Hotkey "^Space", Csv_Reset, "On"
   Hotkey "``", Csv_Off, "On"
   GuiBox.Hide()
   return true
 }
+
 PPt_Active(Button, Info) {
   global
-  if(ActiveFlag & 1 > 0) {
-    Csv_Off(0)
-  } else if(ActiveFlag & 4 > 0) {
-    Mor_Off(0)
-  }
+  All_Off(0)
   ActiveFlag |= 2
   Hotkey "^1", PPt_1, "On"
   Hotkey "^2", PPt_2, "On"
@@ -69,30 +41,26 @@ PPt_Active(Button, Info) {
   GuiBox.Hide()
   return true
 }
-Mor_Active(Button, Info) {
+
+Chk_Active(Button, Info) {
   global
-  if(ActiveFlag & 1 > 0) {
-    Csv_Off(0)
-  } else if(ActiveFlag & 2 > 0) {
-    PPt_Off(0)
-  }
+  All_Off(0)
   ActiveFlag |= 4
-  CityIndex := 1
-  Hotkey "BS", Mor_Copy, "On"
-  Hotkey "NumpadAdd", Mor_Next, "On"
-  Hotkey "NumpadMult", Mor_Reset, "On"
-  Hotkey "+NumpadAdd", Mor_Auto, "On"
-  Hotkey "+NumpadMult", Mor_AutoStop, "On"
-  Hotkey "``", Mor_Off, "On"
+  StepCt := 1
+  Hotkey "NumpadAdd", Chk_Step, "On"
+  Hotkey "!NumpadAdd", Chk_ChangeStep, "On"
+  Hotkey "``", Chk_Off, "On"
   GuiBox.Hide()
+  Chk_Menu()
   return true
 }
+
 Active_Check(Button, Info) {
   global
   GuiBox.Hide()
   CheckString := "CSV: " . ((ActiveFlag & 1 > 0) ? "On" : "Off")
   CheckString .= "`nMonthly: " . ((ActiveFlag & 2 > 0) ? "On" : "Off")
-  CheckString .= "`nPBP: " . ((ActiveFlag & 4 > 0) ? "On" : "Off")
+  CheckString .= "`nCheck: " . ((ActiveFlag & 4 > 0) ? "On" : "Off")
 ;  CheckString .= "`nClicks Eaten: " . ClicksEaten
   MsgBox CheckString
   return true
@@ -105,10 +73,10 @@ global CSVBtn := GuiBox.AddButton(, "CSV Helper")
 CSVBtn.OnEvent("Click", Csv_Active)
 global PPTBtn := GuiBox.AddButton(, "Monthly Helper")
 PPTBtn.OnEvent("Click", PPt_Active)
-global MORBtn := GuiBox.AddButton(, "PBP MOR Helper")
-MORBtn.OnEvent("Click", Mor_Active)
-global MORBtn := GuiBox.AddButton(, "Active Scripts")
-MORBtn.OnEvent("Click", Active_Check)
+global ChkBtn := GuiBox.AddButton(, "Check Refund Helper")
+ChkBtn.OnEvent("Click", Chk_Active)
+global ScrBtn := GuiBox.AddButton(, "Active Scripts")
+ScrBtn.OnEvent("Click", Active_Check)
 
 Csv_Next(foo) {
   global
@@ -139,6 +107,18 @@ Csv_Next(foo) {
   }
 }
 
+Csv_416(foo) {
+  global
+  Click 453, 395
+  Sleep 200
+  Click 1369, 720
+  Sleep 200
+  Click 1238, 860
+  Sleep 200
+  Click 1778, 994
+  StepCt++
+}
+
 Csv_Reset(foo) {
   global
   StepCt := 1
@@ -148,144 +128,10 @@ Csv_Reset(foo) {
 Csv_Off(foo) {
   global
   Hotkey "NumpadAdd", "Off"
+  Hotkey "+NumpadAdd", "Off"
   Hotkey "^Space", "Off"
   Hotkey "``", "Off"
   ActiveFlag &= (255-1)
-}
-
-Mor_Copy(foo) {
-  global
-  Click 2100, 270
-  Sleep 100
-  Click 1975, 268
-  Sleep 100
-  Send "{Shift down}{Ctrl down}"
-  Sleep 100
-  Send "{Right}{Up}"
-  Sleep 100
-  Send "{Down}"
-  Sleep 100
-  Send "{Shift up}{Ctrl up}"
-  Sleep 100
-  Send "^c"
-  Sleep 100
-  Send "{Alt down}"
-  Sleep 100
-  Send "{Tab}"
-  Sleep 100
-  Send "{Right}"
-  Sleep 100
-  Send "{Alt up}"
-  Sleep 200
-  Send "{Ctrl down}"
-  Sleep 100
-  Send "v"
-  Sleep 100
-  Send "{Up}"
-  Sleep 100
-  Send "{Down}"
-  Sleep 100
-  Send "{Ctrl up}"
-  Sleep 100
-  Send "{Down}"
-  Sleep 100
-  Send "!{Tab}"
-  Sleep 200
-  Send "{Esc}"
-  Sleep 100
-  Send "^w"
-}
-
-Mor_Next(foo) {
-  global
-  xf := "xf"
-  yf := "yf"
-  flag := false
-  MorFound := false
-  Click 326, 304
-  Sleep 100
-  Click 326, Cities[CityIndex]
-  Sleep 100
-  While(!flag) {
-    flag := PixelSearch(&xf,&yf,785,300,800,315,0x555555, 64)
-    Sleep 200
-  }
-  Click 732, 304
-  Sleep 100
-  Click 732, 485 ; Deposit Individual Transaction Detail
-  Sleep 200
-  Click 1670, 304
-  CityIndex := CityIndex + 1
-  
-  flag := false
-  Sleep 100
-  While(!flag) { ; looking for reset Generate
-    flag := PixelSearch(&xf,&yf, 1590, 293,1600,303,0x629641, 8)
-    Sleep 200
-  }
-  flag := false
-  flag := PixelSearch(&xf,&yf,137,520,147,530,0xf3f3f3, 8)
-  If(flag) { ; 1+ records found
-    MorFound := true
-    Click 1328, 372 ; download xslx
-    flag := false
-    Sleep 200
-    While(!flag) { ; looking for excel icon in downloads
-		   ; this is WIDE on the x-axis.
-      flag := PixelSearch(&xf,&yf,1400,120,1505,140,0x107c41, 16)
-      Sleep 200
-    }
-    Click 1534, 160, 0 ; extra time needed to get it to trigger
-    Sleep 500
-    Click 1534, 170, 2 ; doubleclick downloaded file
-    Sleep 1500
-    Click 1328, 135 ; refocus on browser
-  } Else {
-    MorFound := false
-  }
-}
-
-Mor_Auto(foo) {
-  global
-  xf := "xf"
-  yf := "yf"
-  While(CityIndex <= Cities.Length) {
-    Mor_Next(foo)
-    Sleep 200
-    If(MorFound) {
-      flag := false
-      While(!flag) { ; waiting for sheet to load
-        flag := PixelSearch(&xf,&yf,3292,245,3297,250,0x000000,8)
-        Sleep 200
-      }
-      Sleep 300
-      Mor_Copy(foo)
-    }
-    Sleep 200
-  }
-  MsgBox "Finished!"
-}
-
-Mor_AutoStop(foo) {
-  global
-  CityIndex := Cities.Length + 1
-}
-
-Mor_Reset(foo) {
-  global
-  CityIndex := 1
-  MsgBox "City Index reset to Anchorage"
-}
-
-Mor_Off(foo) {
-  global
-  Hotkey "BS", "Off"
-  Hotkey "NumpadAdd", "Off"
-  Hotkey "NumpadMult", "Off"
-  Hotkey "+NumpadAdd", "Off"
-  Hotkey "+NumpadMult", "Off"
-  Hotkey "``", "Off"
-  ActiveFlag &= (255-4)
 }
 
 PPt_1(foo) {
@@ -319,4 +165,250 @@ PPt_Off(foo) {
   Hotkey "^4", "Off"
   Hotkey "``", "Off"
   ActiveFlag &= (255-2)
+}
+
+Chk_Menu(*) {
+  global MyGui := Gui(,"Variable Input")
+  MyGui.Add("Text",, "Station:")
+  MyGui.Add("Text",, "Memo:")
+  MyGui.Add("Text",, "Amount:")
+  MyGui.Add("Text",, "Bill Name:")
+  MyGui.Add("Text",, "Folder:")
+  MyGui.Add("Radio","Group Checked vType", "Access Device")
+  MyGui.Add("Radio",, "Monthly Permit")
+  MyGui.Add("Edit", "vStation ym")
+  MyGui.Add("Edit", "vMemo")
+  MyGui.Add("Edit", "vAmount")
+  MyGui.Add("Edit", "vBill")
+  MyGui.Add("Edit", "vFolder")
+  MyGui.Add("Button", "default", "OK").OnEvent("Click", Chk_Vars)
+  MyGui.OnEvent("Close", Chk_Vars)
+  MyGui.Show()
+}
+
+Chk_Vars(*) {
+  global MyGui
+  global InVars := MyGui.Submit()
+}
+
+Chk_ScreenShot(x, y) {
+  Send "#+s"
+  Sleep 1500
+  Click 20, 270, "Down"
+  Sleep 200
+  Click x, y, "Up"
+  Sleep 2000
+  Click 1740, 820
+  Sleep 1500
+  Send "!{Esc}" ; Windows doesn't like letting you alt-tab, but this works
+  Sleep 200
+  Send "^s"
+}
+
+Chk_Step(*) {
+  global StepCt
+  global InVars
+  Sleep 200
+  Sleep 200
+  if(StepCt = 1) {
+    ; Cash Refund
+    Send InVars.Station "{Tab}"
+    Sleep 5000
+    Click 20, 270, "WU", 5
+    Sleep 200
+    Click 160, 520
+    Sleep 200
+    Send "14{Tab 6}"
+    Send InVars.Memo
+    Click 20, 270, "WD", 5
+    Sleep 200
+    Sleep 200
+    Click 60, 885
+    if(InVars.Type = 1) {
+      Send "park{Tab}"
+    } else {
+      Send "mon{Tab}"
+    }
+    Sleep 2000
+    Send "{Tab}"
+    Sleep 200
+    Send InVars.Memo "{Tab 2}"
+    Sleep 500
+    Send InVars.Amount "{Tab 3}"
+    Sleep 500
+    Send InVars.Station "{Tab}"
+    Sleep 500
+    Click 20, 270, "WD", 3
+    Sleep 200
+    Sleep 200
+    Click 80, 915
+  } else if(StepCt = 2) {
+    ; CR screenshot
+    A_Clipboard := ""
+    Click 60, 327, 2
+    Sleep 200
+    Send "^c"
+    ClipWait
+    Click 60, 237, 1
+    Sleep 200
+    RefundID := A_Clipboard
+    Chk_ScreenShot(1650, 700)
+    Sleep 1000
+    Send "CR " RefundID
+  } else if(StepCt = 3) {
+    ; CR save screenshot
+    Send InVars.Folder "{Enter}"
+    Sleep 600
+    Send "!s"
+    Sleep 200
+    Sleep 200
+    Send "!{F4}"
+  } else if(StepCt = 4) {
+    ; Deposit part 1
+    Send "{Tab}10351{Tab 3}" InVars.Memo
+    Sleep 200
+    Click 87, 725
+  } else if(StepCt = 5) {
+    ; Deposit part 2
+    Click 87, 725, "WU", 10
+    Sleep 200
+    Sleep 200
+    Sleep 200
+    Click 265, 725
+    Sleep 200
+    Send "{Tab}"
+    Sleep 200
+    Send InVars.Amount "{Tab}"
+    Sleep 200
+    Send "24007{Tab 3}"
+    Sleep 200
+    Send InVars.Station "{Tab}"
+    Sleep 1000
+    Click 80, 870
+  } else if(StepCt = 6) {
+    ; Deposit screenshot
+    A_Clipboard := ""
+    Click 60, 327, 2
+    Sleep 200
+    Send "^c"
+    ClipWait
+    Click 60, 237, 1
+    Sleep 200
+    RefundID := A_Clipboard
+    Chk_ScreenShot(1770, 560)
+    Sleep 1000
+    Send "Deposit " RefundID
+  } else if(StepCt = 7) {
+    ; Deposit save screenshot
+    Send InVars.Folder "{Enter}"
+    Sleep 600
+    Send "!s"
+    Sleep 200
+    Sleep 200
+    Send "!{F4}"
+  } else if(StepCt = 8) {
+    ; Bill
+    Click 87, 725, "WD", 3
+    Sleep 200
+    Sleep 200
+    Click 1070, 425 ; GEO
+    Sleep 200
+    Send "[geo string]{Tab}"
+    Click 87, 725, "WU", 5
+    Sleep 200
+    Sleep 200
+    Click 1075, 400
+    Sleep 200
+    Send InVars.Memo
+    Sleep 200
+    Click 175, 448
+    Sleep 200
+    Send InVars.Bill
+    Click 175, 448, "WD", 5
+    Sleep 200
+    Sleep 200
+    Click 185, 880
+    Sleep 200
+    Send "park"
+    Sleep 200
+    Send "{Down}"
+    Sleep 200
+    Send "{Tab}"
+    Sleep 1000
+    Send InVars.Station "{Tab 2}"
+    Sleep 1000
+    Send InVars.Memo "{Tab}"
+    Sleep 200
+    Send InVars.Amount "{Tab}"
+    Click 175, 448, "WD", 3
+    Sleep 500
+    Click 80, 915
+    Sleep 1000
+    Click 175, 448, "WD", 3
+    Sleep 200
+    Sleep 200
+    Click 220, 625
+    Sleep 200
+    Click 335, 905
+  } else if(StepCt = 9) {
+    ; Bill screenshot
+    Chk_ScreenShot(1500, 960)
+    Sleep 1000
+    Send "Bill " InVars.Bill
+  } else if(StepCt = 10) {
+    ; Bill save screenshot
+    Send InVars.Folder "{Enter}"
+    Sleep 600
+    Send "!s"
+    Sleep 200
+    Sleep 200
+    Send "!{F4}"
+  } else {
+    MsgBox("Out of steps!")
+  }
+  StepCt += 1
+}
+
+Chk_ChangeStep(*) {
+  global StepGui := Gui(,"Choose new step")
+  StepGui.Add("Radio", "Group Checked vNewStep", "1. Cash Refund")
+  StepGui.Add("Radio",, "2. CR Screencap")
+  StepGui.Add("Radio",, "3. CR Save SC")
+  StepGui.Add("Radio",, "4. Deposit part 1")
+  StepGui.Add("Radio", "ym", "5. Deposit part 2")
+  StepGui.Add("Radio",, "6. Deposit Screencap")
+  StepGui.Add("Radio",, "7. Deposit Save SC")
+  StepGui.Add("Radio",, "8. Bill")
+  StepGui.Add("Radio",, "9. Bill Screencap")
+  StepGui.Add("Radio",, "10. Bill Save SC")
+  StepGui.Add("Button", "default", "OK").OnEvent("Click", Chk_GetStep)
+  StepGui.OnEvent("Close", Chk_GetStep)
+  StepGui.Show()
+}
+
+Chk_GetStep(*) {
+  global StepCt
+  global StepGui
+  tempvar := StepGui.Submit()
+  StepCt := tempvar.NewStep
+}
+
+Chk_Off(*) {
+  global
+  Hotkey "NumpadAdd", "Off"
+  Hotkey "!NumpadAdd", "Off"
+  Hotkey "``", "Off"
+  ActiveFlag &= 255-4
+}
+
+All_Off(foo) {
+  try {
+  Csv_Off(0)
+  }
+  try {
+  PPt_Off(0)
+  }
+  try {
+  Chk_Off(0)
+  }
 }
