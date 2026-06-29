@@ -8,7 +8,7 @@ Processes a report from PayByPhone for easy copying into a csv template. No long
 
 ### Auto PBP New - ExcelScript
 
-(currently unfinished) As above, but for the new report format. It's turning out to be a bit more troublesome, which I blame on pivot tables.
+As above, but for the new report format. It's turning out to be a bit more troublesome, which I blame on pivot tables.
 
 ### EMF JE Autosum - ExcelScript
 
@@ -21,6 +21,10 @@ Processes a report taken directly from PBP's site, using different calculations 
 ### Gravity Pivot - ExcelScript
 
 Creates a pivot table from report data, then switches to that sheet to write some sums that are useful at a glance. Not terribly complicated.
+
+### PBP Template Generator - ExcelScript
+
+Processes a 2026-era PBP report, then generates and switches to an export tab, ready to be CSV'd once the links are refreshed. Uses more Excel formulas to take advantage of dynamic ranges so the export tab is always the correct height. Designed to be attached to a button for ease of use and ease of teaching.
 
 ### WSS Format Disb - ExcelScript
 
