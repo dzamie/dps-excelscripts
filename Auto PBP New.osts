@@ -1,1 +1,242 @@
-{"version":"0.3.0","body":"/* Post-Nov-2025 PBP\n * \n * Human instructions:\n *  1. Drag template into PBP book\n *  2. Copy 2x4 label+formulas from prior book to Backoffice Reports AK1:AN2\n *  3. (fix the VLookup one so it's just looking at the current book)\n *  4. Select Column V (PBP Loc ID), Data -> Text to Columns -> Finish\n *  5. Autofill the 4 columns to bottom of data (Ctrl+D)\n *  6. Make new sheet for Pivot Table\n *  7. Point Pivot Table at Backoffice Reports\n *  8. Filter: Payment Status, Purchase ID\n *  9. Rows: Payment Date (Day), Client Lot ID\n * 10. Cols: Parking Amount2, DPS Fee, ACH\n * 11. Filter Payment Status: APPROVED\n * 12. Filter Purchase ID: everything BUT #N/A\n * 13. Copy Lot IDs into template twice: once for NS 735, once for 2206\n * 14. (fill in NS Account #s and dates)\n * 15. Copy Parking Amount2 to 735 rows\n * 16. Copy DPS Fee to 2206 rows\n * 17. Check for #N/A External IDs, clean up Ghost Codes and rogue date summaries\n * 18. Filter to Amount=0, delete those rows\n * 19. Sort Date -> Station -> NS Account\n * 20. Delete blank rows\n * 21. Check company totals against Summary, mark 11/12 sums\n * 22. Save, close, reopen, export to .csv\n */\n\n/* Automation plan:\n * 00. (Human) Drag template into PBP book\n * 01. Write Parking Amount, PBP Fee, DPS Fee, ACH to Backoffice AK1:AN1\n * 02. Write =+J2, =VLOOKUP(V2,'Fee Schedule'!A:B,2,FALSE), =+S2-AL2, =+AK2+AM2 to AK2:AN2\n * 03. Find last A#, autoFill AK2:AN2 to AK#:AN#\n *   *** update: add \"Trans Date\" column with round(numbervalue,0) so that the date pivot works properly\n * 04. Take V2:V#, map Number(val), setValues with the numbers\n * 05. Make new sheet, add Pivot Table to it: A1:AN#:\n *   00. AddColumnHierarchy: day, Client Lot ID\n *   01. AddDataHierarchy: Parking Amount2, DPS Fee, ACH\n *   02. AddFilterHierarchy: Purchase ID, Payment Status\n *   03. make ExcelScript.PivotLabelFilters: both beginsWith, substring \"APPROVED\" and \"#N/A\", exclusive false and true respectively\n *   04. each filterhierarchy.applyfilter({labelfilter: filter})\n *   05. foreach day in date.getitems: day.setisexpanded(true)\n *   06. table.getlayout.setlayouttype(tabular) (makes days easier)\n * 06. Set F4 = \"=A4+0\" (looking for dates)\n * 07. Find bottom of pivot table \"#\" (incl. grand total)\n * 08. Make new sheet for template-filler, head with Date, Station, NS Account, Amount\n * 09. Copy pivot!F4:F# to template!a2, save lowest row value \"%\", copy again\n * 10. Copy pivot!B4:B# to template!b2, twice\n * 11. Write 735 to template!c2:c%, 2206 to c(%+1):c(2%-1)\n * 12. Copy pivot!C4:C# to template!d2:d%\n * 13. Copy pivot!D4:D# to template!d(%+1):d(2%-1)\n * 14. template!B:B replaceall(\" - Ghost Code\", \"\", blank criteria)\n * 15. apply autofilter: A? = #VALUE\n * 16. A2->down .delete\n * 17. apply autofilter: D? = 0\n * 18. A2->down .delete\n * 19. unfilter (filter.remove)\n * 20. sort col a -> col b -> col c\n */\n\nfunction process(workbook: ExcelScript.Workbook) {\n  // 00. (Human) Drag template into PBP book\n\n  // 01. Write Parking Amount, PBP Fee, DPS Fee, ACH, Trans Date to Backoffice AK1:AO1\n  // 02. Write =+J2, =VLOOKUP(V2,'Fee Schedule'!A:B,2,FALSE), =+S2-AL2, =+AK2+AM2, =ROUND(NUMBERVALUE(C2),0) to AK2:AO2\n  let backoffice = workbook.getWorksheet(\"PBP Backoffice Reports \")\n  backoffice.getRange(\"AK1:AO2\").setFormulas([[\"Parking Amount2\", \"PBP Fee\", \"DPS Fee\", \"ACH\", \"Trans Date\"], [\"=+J2\", \"=VLOOKUP(V2, 'Fee Schedule'!A:B,2,FALSE)\", \"=+S2-AL2\", \"=+AK2+AM2\", \"=ROUND(NUMBERVALUE(C2),0)\"]])\n\n  // 03. Find last A#, autoFill AK2:AN2 to AK#:AN#\n  let lastRow = backoffice.getRange(\"A1\").getRangeEdge(ExcelScript.KeyboardDirection.down).getRowIndex() + 1 // +1 to offset 0-index for later A1 use\n\n  // 04. Take V2:V#, map Number(val), setValues with the numbers\n  let vee = backoffice.getRange(\"V2:V\" + lastRow.toString()).getValues()\n  let veenum = vee.map((x) => [Number(x[0])])\n  backoffice.getRange(\"V2:V\" + lastRow.toString()).setValues(veenum)\n\n  // 05. Make new sheet, add Pivot Table to it: A1:AN#:\n  let pivotSheet = workbook.addWorksheet(\"Report Pivot\")\n  pivotSheet.setPosition(2) // should put it right next to the reports\n  let reportPivot = pivotSheet.addPivotTable(\"ReportPivot\", \"A1:AO\" + lastRow.toString(), \"A1\")\n\n  //   00. AddColumnHierarchy: day, Client Lot ID\n  reportPivot.addColumnHierarchy(reportPivot.getHierarchy(\"Trans Date\"))\n  reportPivot.addColumnHierarchy(reportPivot.getHierarchy(\"Client Lot ID\"))\n  //   01. AddDataHierarchy: Parking Amount2, DPS Fee, ACH\n  reportPivot.addDataHierarchy(reportPivot.getHierarchy(\"Parking Amount2\"))\n  reportPivot.addDataHierarchy(reportPivot.getHierarchy(\"DPS Fee\"))\n  reportPivot.addDataHierarchy(reportPivot.getHierarchy(\"ACH\"))\n  //   02. AddFilterHierarchy: Purchase ID, Payment Status\n  //   03. make ExcelScript.PivotLabelFilters: both beginsWith, substring \"APPROVED\" and \"#N/A\", exclusive false and true respectively\n  //   04. each filterhierarchy.applyfilter({labelfilter: filter})\n  //   05. foreach day in date.getitems: day.setisexpanded(true)\n  //   06. table.getlayout.setlayouttype(tabular)\n  // 06. Set F4 = \"=A4+0\" (looking for dates)\n  // 07. Find bottom of pivot table \"#\" (incl. grand total)\n  // 08. Make new sheet for template-filler, head with Date, Station, NS Account, Amount\n  // 09. Copy pivot!F4:F# to template!a2, save lowest row value \"%\", copy again\n  // 10. Copy pivot!B4:B# to template!b2, twice\n  // 11. Write 735 to template!c2:c%, 2206 to c(%+1):c(2%-1)\n  // 12. Copy pivot!C4:C# to template!d2:d%\n  // 13. Copy pivot!D4:D# to template!d(%+1):d(2%-1)\n  // 14. template!B:B replaceall(\" - Ghost Code\", \"\", blank criteria)\n  // 15. apply autofilter: A? = #VALUE\n  // 16. A2->down .delete\n  // 17. apply autofilter: D? = 0\n  // 18. A2->down .delete\n  // 19. unfilter (filter.remove)\n  // 20. sort col a -> col b -> col c\n}\n\nfunction main(workbook: ExcelScript.Workbook) {\n\n    // Get the active cell and worksheet.\n    let selectedCell = workbook.getActiveCell();\n    let selectedSheet = workbook.getActiveWorksheet();\n    \n    let rng = workbook.getWorksheet(\"PBP Backoffice Reports \").getRange(\"A1:C5\")\n\n    let pivot = selectedSheet.getPivotTable(\"pivot?\")\n    pivot.delete()\n\n    pivot = selectedSheet.addPivotTable(\"pivot?\", rng, selectedSheet.getRange(\"A1\"))\n    pivot.addColumnHierarchy(pivot.getHierarchy(\"Payment Date\"))\n\n    // let hrs = pivot.getHierarchies()\n    // hrs.forEach((x) => console.log(x.getName()))\n\n}\n","description":"","noCodeMetadata":"","parameterInfo":"{\"version\":1,\"originalParameterOrder\":[],\"parameterSchema\":{\"type\":\"object\",\"default\":{},\"x-ms-visibility\":\"internal\"},\"returnSchema\":{\"type\":\"object\",\"properties\":{}},\"signature\":{\"comment\":\"\",\"parameters\":[{\"name\":\"workbook\",\"comment\":\"\"}]}}","apiInfo":"{\"variant\":\"synchronous\",\"variantVersion\":2}"}
+/*  | Changelog: |
+ *
+ * 2026.03.26 - Now automatically removes "Ghost Code" from station
+ * 
+ */
+
+/* TODO:
+ * - calculate company totals (co05 is "5*", co12 is "4593", co11 is all else)
+ * 
+ */ 
+
+/* 
+ * Manual method:
+ *  1. Paste & fix formulas into PBP Backoffice Reports
+ *  2. Autofill down to end
+ *  3. Change column V from Text to Number/General
+ *  4. Make new sheet (usu. between Backoffice and template)
+ *  5. Add new pivot table to new sheet, source A1:end of Backoffice
+ *  6. Filter: Payment Status == APPROVED, Purchase ID != #N/A
+ *  7. Rows: Date (tabular, repeating), Client Lot ID
+ *  8. Cols: Payment Amount2, DPS Fee, ACH
+ *  9. Copy Date+Station into template twice
+ * 10. NS Acct = 735 for top copy, 2206 for bottom
+ * 11. Copy Payment Amount2 to 735 Amount, DPS Fee to 2206 Amount
+ * 12. Replace A918 - Ghost Code with A918
+ * 13. Delete stationless rows (gets rid of day totals)
+ * 14. Delete $0 Amount rows
+ * 15. Sort Date -> Station -> NS Acct
+ * 16. Ensure all dates are at least the filename start date
+ * 17. Re-sort
+ * 18. Mark co11, co12 sums on Summary page
+ * 19. Check grand totals are equal
+ * 20. Check no more #N/As in Template's Subsidiary External ID
+ * 21. Save, exit, reenter, save template as csv
+ * 
+ * Program plan:
+ * 00. Clear filters from Backoffice
+ * 01. Find bottom row of Backoffice (use col A)
+ * 02. Fill AK2:AO2 with formulas, autofill to AO[end]
+ * 03. Set V2:Vend values as themselves
+ * 04. Make new sheets Filtered, PsuedoPivot
+ * 05. Read Backoffice 1:end where AJ != #N/A and AA == APPROVED into array, keeping minDate, maxDate
+ * 06. Write raw array to Filtered for troubleshooting
+ * 07. Set up hashtable, intended (date, station) -> (sum(parking), sum(dps fee), sum(ach))
+ * 08. Set up "problem transactions" array (date, station, ach)
+ * 09. Iterate back through array:
+ *   00. If ach < 0, add (date, station, ach) to problem array
+ *   01. If date == minDate != maxDate, date = minDate + 1
+ *   02. If (date, station) DNE, hash[(date,station)] = (0,0,0)
+ *   03. hash[(date,station)] += (parking, dps, ach)
+ * 10. Iterate through hashtable:
+ *   00. Write (date, station, parking, dps, ach) to PseudoPivot A?:E?
+ *   01. Write (date, station, 735, parking) to PP I(2?-2):L(2?-2)
+ *   02. Write (date, station, 2206, dps) to PP I(2?-1):L(2?-1)
+ * 11. Write "problem transactions" array to PP Fx:Hx
+ * 12. Focus active cell to PP!A1
+ */
+
+function floatify(cellValue: (string | number | boolean)) {
+    return parseFloat(cellValue.toString())
+}
+
+function payByPhone(workbook: ExcelScript.Workbook) {
+    let backoffice = workbook.getWorksheet("PBP Backoffice Reports ")
+    let filtersheet = workbook.addWorksheet("Filtered")
+    let sumsheet = workbook.getWorksheet("Summary")
+    let ppivot = workbook.addWorksheet("PseudoPivot")
+    ppivot.setPosition(2)
+    // reminder: these are 0-based for arrays, not 1-based for addresses
+    let stationCol = 22
+    let payCol = 26
+    let pidCol = 35
+    let parkCol = 36
+    let dpsCol = 38
+    let achCol = 39
+    let dateCol = 40
+
+    // 00. Clear filters from Backoffice
+    backoffice.getAutoFilter().clearCriteria()
+
+    // 01. Find bottom row of Backoffice (use col A)
+    let lastrow = backoffice.getRange("A1").getRangeEdge(ExcelScript.KeyboardDirection.down).getRowIndex() + 1 // compensate for 0-index/1-index
+
+    // 02. Fill AK2:AO2 with formulas, autofill to AO[end]
+    let formulas = [["Parking Amount", "PBP Fee", "DPS Fee", "ACH", "Date"], ["=+J2", "=VLOOKUP(V2,'Fee Schedule'!A:B,2,FALSE)", "=+S2-AL2", "=+AK2+AM2", "=ROUND(C2,0)"]]
+    backoffice.getRange("AK1:AO2").setFormulas(formulas)
+    backoffice.getRange("AK2:AO2").autoFill(`AK2:AO${lastrow}`)
+    // backoffice.getRange("AJ2").select()
+    console.log("Last row: " + lastrow.toString())
+
+    // backoffice.getRange("A0") //crash here please
+
+    // 03. Set V2:Vend values as themselves
+    backoffice.getRange(`V1:V${lastrow}`).setValues(backoffice.getRange(`V1:V${lastrow}`).getValues())
+
+    // 04. Make new sheets Filtered, PsuedoPivot
+    // (done at start of function)
+
+    // 05. Read Backoffice 1:end where AJ != #N/A and AA == APPROVED into array, keeping minDate, maxDate
+    let filterarr = backoffice.getRange("A2:AO" + lastrow.toString()).getValues().filter((line) => line[payCol].toString().startsWith("APP") && ! line[pidCol].toString().includes("#N/A") && line[pidCol].toString().length > 1)
+    filterarr.sort((line1, line2) => floatify(line1[dateCol]) - floatify(line2[dateCol]))
+    let minDate = floatify(filterarr[0][dateCol])
+    let maxDate = floatify(filterarr[filterarr.length-1][dateCol])
+
+    // 06. Write raw array to Filtered for troubleshooting
+    filtersheet.getRange("A1:AO1").setValues(backoffice.getRange("A1:AO1").getValues())
+    filtersheet.getRange(`A2:AO${filterarr.length+1}`).setValues(filterarr)
+
+    // 07. Set up hashmap, intended (date, station) -> (sum(parking), sum(dps fee), sum(ach))
+    let pivotmap = new Map<string, number[]>() // .has doesn't work with arrays, so I'll be doing "date@station"
+
+    // 08. Set up "problem transactions" array (date, station, ach)
+    let refunds = [[3,"uwu",true]]
+    refunds.pop()
+
+    // 09. Iterate back through array:
+    for(let i = 0; i < filterarr.length; i ++) {
+
+    //   00. If ach < 0, add (date, station, ach) to refunds array
+        if(floatify(filterarr[i][achCol]) < 0) {
+            refunds.push([filterarr[i][dateCol], filterarr[i][stationCol], filterarr[i][achCol]])
+        }
+
+    //   01. If date == minDate != maxDate, date = minDate + 1
+        if(floatify(filterarr[i][dateCol]) == minDate) {
+            filterarr[i][dateCol] = floatify(filterarr[i][dateCol]) + 1
+        }
+    
+    //   02. If "Ghost Code", remove it
+        if(filterarr[i][stationCol].toString().includes("Ghost")) {
+            filterarr[i][stationCol] = filterarr[i][stationCol].toString().replace(" - Ghost Code", "")
+        }
+
+    //   03. If (date, station) DNE, hash[(date,station)] = (0,0,0)
+        let key = filterarr[i][dateCol].toString() + "@" + filterarr[i][stationCol].toString()
+        if(!pivotmap.has(key)) {
+            pivotmap.set(key, [0,0,0])
+        }
+
+    //   04. hash[(date,station)] += (parking, dps, ach)
+        let temp = pivotmap.get(key)
+        temp[0] += floatify(filterarr[i][parkCol])
+        temp[1] += floatify(filterarr[i][dpsCol])
+        temp[2] += floatify(filterarr[i][achCol])
+        pivotmap.set(key, temp)
+
+    }
+    // 10. Iterate through hashmap:
+    let i = 2
+    let j = 2
+    let coSums = [0,0,0] // keep track of company sums
+    pivotmap.forEach((values, key) => {
+
+    //   00. Write (date, station, parking, dps, ach) to PseudoPivot A?:E?
+        let split = key.split("@")
+        let insert = [split[0], split[1], values[0], values[1], values[2]]
+        ppivot.getRange(`A${i}:E${i}`).setValues([insert])
+
+    //   01. Write (date, station, 735, parking) to PP J(2?-2):M(2?-2)
+        if(insert[2] != 0) {
+            ppivot.getRange(`J${j}:M${j}`).setValues([[insert[0],insert[1], 735, insert[2]]])
+            j ++
+        }
+
+    //   02. Write (date, station, 2206, dps) to PP J(2?-1):M(2?-1)
+        if(insert[3] != 0) {
+            ppivot.getRange(`J${j}:M${j}`).setValues([[insert[0], insert[1], 2206, insert[3]]])
+            j ++
+        }
+
+        // company sum tracking
+        if (insert[1].toString().startsWith("5")) {         // co05
+            coSums[0] += floatify(insert[4])
+        } else if (insert[1].toString().includes("4593")) { // co12
+            coSums[2] += floatify(insert[4])
+        } else {                                            // co11
+            coSums[1] += floatify(insert[4])
+        }
+
+        i ++ // "hmm I wonder why it's only generating 1 line of output"
+    })
+    // 11. Write "problem transactions" array to PP Fx:Hx
+    if(refunds.length > 0) {
+        ppivot.getRange(`F2:H${refunds.length + 1}`).setValues(refunds)
+        // highlight them in orange for visibility
+        ppivot.getRange(`F2:H${refunds.length + 1}`).getFormat().getFill().setColor("orange")
+    }
+
+    // 12. Write column labels in PP
+    ppivot.getRange("A1:M1").setValues([["Date", "Station", "Parking Amount", "DPS Fee", "ACH", "Neg Date", "Neg Station", "Neg ACH", "", "Date", "Station", "NS Account", "Value"]])
+
+
+    // 14. a few formatting things
+    ppivot.getRange("A:A").setNumberFormat("m/d/yyyy")
+    ppivot.getRange("F:F").setNumberFormat("m/d/yyyy")
+    ppivot.getRange("J:J").setNumberFormat("m/d/yyyy")
+    ppivot.getRange("M:M").setNumberFormat("\$#,##0.00")
+    ppivot.getRange("J1:M1").getExtendedRange(ExcelScript.KeyboardDirection.down).getSort().apply([{ key: 0, ascending: true }, { key: 1, ascending: true }, { key: 2, ascending: true}], false, true)
+    ppivot.getRange("A:M").getFormat().autofitColumns()
+    ppivot.getRange("A1:M1").getFormat().getFont().setBold(true)
+
+    // 15. Calculate company sums, write to Summary
+    sumsheet.getRange("D6:E7").setNumberFormat(sumsheet.getRange("C6").getNumberFormat())
+    sumsheet.getRange("D6:E7").setValues([[coSums[0], ""], [coSums[1], coSums[2]]])
+
+    // 16. Move Summary images out of the way
+    sumsheet.getShapes().forEach((shape) => {
+        shape.setLeft(shape.getLeft() + 300)
+        shape.setTop(shape.getTop() - 150)
+    })
+
+    // 13. Focus active cell to PP!A1
+    sumsheet.getRange("A1").select() // scroll summary sheet view
+    sumsheet.getRange("B15").select() // scroll sheet tab list
+    ppivot.getRange("J2:M2").getExtendedRange(ExcelScript.KeyboardDirection.down).select()
+}
+
+
+function main(workbook: ExcelScript.Workbook) {
+
+    // uwu
+
+    let filtered = workbook.getWorksheet("Filtered")
+    let ppivot = workbook.getWorksheet("PseudoPivot")
+    if(filtered != undefined) {
+        filtered.delete()
+    }
+    if(ppivot != undefined) {
+        ppivot.delete()
+    }
+    payByPhone(workbook)
+
+    // Get the active cell and worksheet.
+    // let selectedCell = workbook.getActiveCell();
+    // let selectedSheet = workbook.getActiveWorksheet();
+
+    // // Set fill color to yellow for the selected cell.
+    // selectedCell.getFormat().getFill().setColor("yellow");
+
+    // TODO: Write code or use the Insert action button below.
+
+}
