@@ -1,0 +1,115 @@
+// Note to self: when copying this back off GH,
+// remember to escape the ['] and [\] characters
+// in the dummied-out master sheet paths.
+
+function main(workbook: ExcelScript.Workbook) {
+    // Get the active cell and worksheet.
+    let selectedCell = workbook.getActiveCell();
+    let currSheet = workbook.getActiveWorksheet();
+    currSheet.getUsedRange().clear()
+    let formulas = [[
+        'MaxDate',
+        '={"MinDate","St"}',
+        '',
+        'Parking Amount',
+        'Parking Code',
+        'DPS Fees',
+        'DPS Code',
+        '={"Date","Station","NS Account","Amount"}',
+        '',
+        '',
+        '',
+        'Memo',
+        'Date (mm/dd/yyyy)',
+        'Subsidiary External ID',
+        'External ID',
+        'Customer External ID',
+        'Station External ID',
+        'Item Internal ID',
+        'Quantity',
+        'Rate',
+        'Item Name',
+        'Aggregator'
+    ],[
+        '=IFERROR(INDEX(B2#,SEQUENCE(COUNTA(B2#)/2),1)+1,"")',
+        '=IFERROR(SORT(SORT(UNIQUE(LET(ans,INDEX(INDIRECT("\'PBP Backoffice Reports \'!A2:W"&COUNT(\'PBP Backoffice Reports \'!C:C)+1),SEQUENCE(COUNT(\'PBP Backoffice Reports \'!C:C)),{3,23}),IFERROR(FLOOR.MATH(ans),ans))),2),1),"")',
+        '',
+        '=IFERROR(SUMIFS(\'PBP Backoffice Reports \'!J:J,\'PBP Backoffice Reports \'!W:W,INDEX(B2#,SEQUENCE(COUNTA(B2#)/2),2),\'PBP Backoffice Reports \'!C:C,">="&INDEX(B2#,SEQUENCE(COUNTA(B2#)/2),1),\'PBP Backoffice Reports \'!C:C,"<"&A2#),"")',
+        '=IFERROR(SEQUENCE(COUNTA(D2#),,735,0),"")',
+        '=IFERROR(SUMIFS(\'PBP Backoffice Reports \'!S:S,\'PBP Backoffice Reports \'!W:W,INDEX(B2#,SEQUENCE(COUNTA(B2#)/2),2),\'PBP Backoffice Reports \'!C:C,">="&INDEX(B2#,SEQUENCE(COUNTA(B2#)/2),1),\'PBP Backoffice Reports \'!C:C,"<"&A2#) - (COUNTIFS(\'PBP Backoffice Reports \'!W:W,INDEX(B2#,SEQUENCE(COUNTA(B2#)/2),2),\'PBP Backoffice Reports \'!C:C,">="&INDEX(B2#,SEQUENCE(COUNTA(B2#)/2),1),\'PBP Backoffice Reports \'!C:C,"<"&A2#) * XLOOKUP(XLOOKUP(INDEX(B2#,SEQUENCE(COUNTA(B2#)/2),2),\'PBP Backoffice Reports \'!W:W,\'PBP Backoffice Reports \'!V:V),\'Fee Schedule\'!A:A,\'Fee Schedule\'!B:B)),"")',
+        '=IFERROR(SEQUENCE(COUNTA(D2#),,2206,0),"")',
+        '=IFERROR(LET(fakerow,SEQUENCE(COUNTA($D$2#)*2),INDEX($B$2#:G2,CEILING.MATH(fakerow/2),IF(MOD(fakerow,2)=1,{1,2,4,3},{1,2,6,5}))),"")',
+        '',
+        '',
+        '',
+        '=IFERROR(TEXTSPLIT(LEFT(REPT("PBP,",COUNTA($D$2#)*2),4*COUNTA($D$2#)*2-1),,","),"")',
+        '=TEXT(INDEX($H$2#,SEQUENCE(2*COUNTA($D$2#)),1),"mm/dd/yyyy")',
+        '=VLOOKUP(TEXT(INDEX($H$2#,SEQUENCE(COUNTA($D$2#)*2),2),0),\'[MASTER STATION LIST FILE]Station list\'!B:D,3,0)',
+        '=$Q$2#&" Mobile Application Parking PBP "&$M$2#',
+        '=VLOOKUP(TEXT(INDEX($H$2#,SEQUENCE(2*COUNTA($D$2#)),2),0),\'[MASTER STATION LIST FILE]Station list\'!B:F,5,0)',
+        '=$P$2#',
+        '=TEXT(INDEX($H$2#,SEQUENCE(2*COUNTA($D$2#)),3),0)',
+        '=SEQUENCE(2*COUNTA($D$2#),1,1,0)',
+        '=TEXT(INDEX($H$2#,SEQUENCE(2*COUNTA($D$2#)),4),0)',
+        '=VLOOKUP(TEXT(INDEX($H$2#,SEQUENCE(2*COUNTA($D$2#)),3),0),\'[MASTER PRODUCTION VALUE FILE]Production Values\'!A:G,5,0)&" PBP "&$P$2#&" "&$M$2#&" 5"',
+        '=L2#'
+    ]]
+    
+    currSheet.getRange("A1:V2").setFormulas(formulas)
+    currSheet.getRange("A:B").setNumberFormat("mm/dd/yyyy")
+    currSheet.getRange("H:H").setNumberFormat("mm/dd/yyyy")
+    currSheet.getRange("D:D").setNumberFormat("#,##0.00")
+    currSheet.getRange("F:F").setNumberFormat("#,##0.00")
+    currSheet.getRange("K:K").setNumberFormat("#,##0.00")
+    currSheet.getRange("T:T").setNumberFormat("#,##0.00")
+    currSheet.getRange("M:V").getFormat().getFill().setColor("FFF2CC")
+    currSheet.getRange("M1:V1").getFormat().getFill().setColor("FFC000")
+    currSheet.getAutoFilter().apply("A1:V1")
+    currSheet.getRange("H:V").getFormat().autofitColumns()
+
+    let outSheet = workbook.addWorksheet("Export")
+    let rawRange = currSheet.getRange("H1:L1").getExtendedRange(ExcelScript.KeyboardDirection.down)
+    let lastRow = rawRange.getRowCount()
+    outSheet.getRange("A1").copyFrom(rawRange,ExcelScript.RangeCopyType.values)
+    outSheet.getRange("B:B").replaceAll("HCCAC","'09801",{})
+    outSheet.getRange("F1:O2").setFormulas([[
+        'Date (mm/dd/yyyy)',
+        'Subsidiary External ID',
+        'External ID',
+        'Customer External ID',
+        'Station External ID',
+        'Item Internal ID',
+        'Quantity',
+        'Rate',
+        'Item Name',
+        'Aggregator'
+    ],[
+        '=TEXT(A2:A' + lastRow + '+1,"mm/dd/yyyy")',
+        '=VLOOKUP(TEXT(B2:B' + lastRow + ',0),\'[MASTER STATION LIST FILE]Station list\'!B:D,3,0)',
+        '=$J$2#&" Mobile Application Parking PBP "&$F$2#',
+        '=VLOOKUP(TEXT(B2:B' + lastRow + ',0),\'[MASTER STATION LIST FILE]Station list\'!B:F,5,0)',
+        '=$I$2#',
+        '=TEXT(C2:C' + lastRow + ',0)',
+        '=SEQUENCE(' + (lastRow - 1) + ',1,1,0)',
+        '=TEXT(D2:D' + lastRow + ',"#,##0.00")',
+        '=VLOOKUP(TEXT(C2:C' + lastRow + ',0),\'[MASTER PRODUCTION VALUE FILE]Production Values\'!A:G,5,0)&" PBP "&$I$2#&" "&$F$2#&" 5"',
+        '=E2:E' + lastRow + ''
+        ]])
+    outSheet.getRange("A:A").setNumberFormat("m/d/yyyy")
+    outSheet.getRange("D:D").setNumberFormat("$#,##0.00")
+    outSheet.getRange("A:O").getFormat().autofitColumns()
+    outSheet.getRange("A:E").getFormat().setColumnWidth(80)
+    outSheet.getRange("H:H").getFormat().setColumnWidth(outSheet.getRange("H:H").getFormat().getColumnWidth() + 50)
+    outSheet.getRange("H:H").getFormat().setHorizontalAlignment(ExcelScript.HorizontalAlignment.center)
+    outSheet.getRange("M:M").getFormat().setHorizontalAlignment(ExcelScript.HorizontalAlignment.right)
+    outSheet.getRange("N:N").getFormat().setColumnWidth(outSheet.getRange("N:N").getFormat().getColumnWidth() + 50)
+    outSheet.getRange("F:O").getFormat().getFill().setColor("FFF2CC")
+    outSheet.getRange("F:O").getFormat().getFont().setName("Arial")
+    outSheet.getRange("F:O").getFormat().getFont().setSize(10)
+    outSheet.getRange("1:1").getFormat().getFont().setBold(true)
+    outSheet.getRange("F1:O1").getFormat().getFill().setColor("FFC000")
+    outSheet.setPosition(2)
+    outSheet.getFreezePanes().freezeRows(1)
+    outSheet.getRange("A2").select()
+    outSheet.getAutoFilter().apply("A1:O1")
+}
