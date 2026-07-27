@@ -8,6 +8,10 @@ In case I want to refer to my previous code, or my office's cloud goes down, hav
 
 Processes a report from PayByPhone for easy copying into a csv template. No longer used as of Nov. 2025, when the company switched to a different format of reports.
 
+### Auto PBP Button
+
+Newest of the three, designed to be attached to a button on a template-generating sheet. Uses a Table to counteract PBP constantly shifting the order and number of data report columns, and has early definition of column names in case those start changing, too. Uses dynamic ranges to mostly avoid keeping manual track of the record count and to make sure the resulting .csv doesn't include any empty-looking lines that nonetheless cause problems on upload.
+
 ### Auto PBP New
 
 As above, but for the new report format. It's turning out to be a bit more troublesome, which I blame on pivot tables.
