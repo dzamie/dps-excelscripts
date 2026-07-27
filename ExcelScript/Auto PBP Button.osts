@@ -1,0 +1,159 @@
+/* Goal: format-agnostic PBP solver
+ * Separate sheet for "important" columns for readability
+ * Also allows for easier =UNIQUEs and =XLOOKUPs
+ * Probably make the template too?
+ * 
+ * Human strategy:
+ * 1. copy magic formulas to data sheet, edit to work with new columns if necessary
+ * 2. new sheet for pivot table: Date, Station -> Parking Amt, DPS Fee, ACH
+ * 3. copy to template, insert 735/2206
+ * 4. replace HCCAC with '09801
+ * 5. replace " - Ghost Code" with ""
+ * 6. delete blanks
+ * 7. delete $0.00s
+ * 8. sort date->station->NS acct
+ * 9. verify station-wise subtotals
+ * 10. save close exit reopen save csv
+ * 
+ * Automation plan:
+ // 00. locate data sheet and turn it into a table
+ // 01. replace all HCCAC with '09801, all " - Ghost Code" with ""
+ // 02. in a new sheet, extract the columns:
+ //   00. Floor(Date)
+ //   01. Client Lot ID
+ //   02. Parking Amount
+ //   03. PBP Fee: =VLOOKUP("PayByPhone Location ID",'Fee Schedule'!A:B,2,FALSE)
+ //   04. DPS Fee: Consumer Transaction Fee - 03.
+ //   05. ACH: 02. + 04.
+ // 03. add UNIQUE(floor:clotid)
+ // 04. grab 00.:05. into an array, grab UNIQUE into an array
+ // 05. make pseudo-sumifs for parking amt and for dps fee
+ // 06. copy unique:dps to new template sheet
+ // 07. sort date->station->NS acct
+ // 08. write in template formulas, format cells
+ // 09. add sumifs to calc sheet per company
+ // 10. present to user for validation
+ * 
+ */
+
+
+function main(workbook: ExcelScript.Workbook) {
+    // Get the active cell and worksheet.
+
+    let btnSheet = workbook.getActiveWorksheet()
+    let sumSheet = workbook.getWorksheets()[0]
+    let datSheet = workbook.getWorksheets()[btnSheet.getPosition() - 1]
+
+    let lotNameHdr = "Client Lot ID"
+    let pbpNameHdr = "PayByPhone Location ID"
+    let dateHdr = "Payment Date"
+    let parkingHdr = "Parking Amount"
+    let pbpFeeHdr = "Consumer Transaction Fee"
+    
+    // 00. locate data sheet and turn it into a table
+    // assumed template goes to the right of the data sheet
+    datSheet.getAutoFilter().remove()
+    let table = datSheet.addTable(datSheet.getUsedRange(),true)
+    table.setName("DataBoi")
+
+
+    // 01. replace all HCCAC with '09801, all " - Ghost Code" with ""
+    table.getColumn(lotNameHdr).getRange().replaceAll("HCCAC", "'09801", {})
+    table.getColumn(lotNameHdr).getRange().replaceAll(" - Ghost Code", "", {})
+
+    // 02. in a new sheet, extract the columns:
+    let pivSheet = workbook.addWorksheet("Intermediate")
+    // let's put it just before the template-to-be
+    pivSheet.setPosition(btnSheet.getPosition())
+    // adding headers now for testing purposes
+    pivSheet.getRange("A1:J1").setValues([["Date","Station","Parking Amount","PBP Fee","DPS Fee","ACH","U.Name","U.Station","U.Parking","U.DPS Fee"]])
+    //   00. Floor(Date)
+    pivSheet.getRange("A2").setFormula(`=TEXT(FLOOR.MATH(DataBoi[[#Data],[${dateHdr}]]),"m/d/yyyy")`)
+    //   01. Client Lot ID
+    pivSheet.getRange("B2").setFormula(`=DataBoi[[#Data],[${lotNameHdr}]]`)
+    //   02. Parking Amount
+    pivSheet.getRange("C2").setFormula(`=DataBoi[[#Data],[${parkingHdr}]]`)
+    //   03. PBP Fee: =VLOOKUP("PayByPhone Location ID",'Fee Schedule'!A:B,2,FALSE)
+    pivSheet.getRange("D2").setFormula(`=VLOOKUP(VALUE(DataBoi[[#Data],[${pbpNameHdr}]]), 'Fee Schedule'!A:B,2,FALSE)`)
+    //   04. DPS Fee: Consumer Transaction Fee - 03.
+    pivSheet.getRange("E2").setFormula(`=DataBoi[[#Data],[${pbpFeeHdr}]] - D2#`)
+    //   05. ACH: 02. + 04.
+    pivSheet.getRange("F2").setFormula(`= C2# + E2#`)
+
+    // 03. add UNIQUE(floor:clotid)
+    pivSheet.getRange("G2").setFormula("=UNIQUE(A2#:B2#)")
+
+    // 04. grab 00.:05. into an array, grab UNIQUE into an array
+    let rawData = pivSheet.getRange("A2#:F2#").getValues()
+    let uniques = pivSheet.getRange("G2#").getValues()
+
+    // 05. make pseudo-sumifs for parking amt and for dps fee
+    // iterate through rows of unique date+station
+    for (let i = 0; i < uniques.length; i++) {
+        let parking = rawData.reduce((acc, curr) => acc + ((curr[0] == uniques[i][0] && curr[1] == uniques[i][1]) ? (curr[2] as number) : 0), 0)
+        let fees = rawData.reduce((acc, curr) => acc + ((curr[0] == uniques[i][0] && curr[1] == uniques[i][1]) ? (curr[4] as number) : 0), 0)
+        uniques[i].push(parking, fees)
+        uniques[i][1] = `'${uniques[i][1]}` // force them to be strings for lookups
+    }
+    // date-station sort
+    uniques.sort((a,b) => (a[0] > b[0]) ? 1 : (a[0] < b[0]) ? -1 : (a[1] > b[1]) ? 1 : -1) // never returns 0, unnecessary
+    pivSheet.getRange("G2#").getResizedRange(0,2).setValues(uniques)
+
+    // 06. copy unique:dps to new template sheet
+    // originally intended to overwrite button sheet, but now this if statement always runs
+    if(btnSheet.getName() != "Output Template") { // make sure I've got the right sheet
+        btnSheet = workbook.addWorksheet("Output Template")
+        btnSheet.getRange("A1").setValue("delet me") // make sure getUsedRange isn't undefined
+    }
+    btnSheet.getUsedRange().clear() // clean slate, ready for template-ing
+    let outarr: (string | number | boolean)[][] = []
+    for(let i = 0; i < uniques.length; i ++) {
+        // ifs aren't strictly necessary but I just don't like uploading 0s
+        if(uniques[i][2] != 0) {
+            outarr.push([uniques[i][0], uniques[i][1], 735, uniques[i][2], "PBP"])
+        }
+        if(uniques[i][3] != 0) {
+            outarr.push([uniques[i][0], uniques[i][1], 2206, uniques[i][3], "PBP"])
+        }
+    }
+
+    let endrow = outarr.length + 1
+    btnSheet.getRange(`A2:E${endrow}`).setValues(outarr)
+    btnSheet.getRange("A1:O1").setValues([["Date", "Station", "NS Account", "Amount", "Memo", "Date (mm/dd/yyyy)", "Subsidiary External ID", "External ID", "Customer External ID", "Station External ID", "Item Internal ID", "Quantity", "Aggregator", "Rate", "Item Name"]])
+
+    // 07. sort date->station->NS acct
+    // already done
+
+    // 08. write in template formulas, format cells
+    // using silly dynamic ranges so I don't have to delete unused rows after the data B-)
+    btnSheet.getRange("F2").setFormula(`=TEXT(A2:A${endrow}, "mm/dd/yyyy")`)
+    btnSheet.getRange("G2").setFormula(`=VLOOKUP(TEXT(B2:B${endrow},0),'[##MASTER STATION LIST##]Station list'!B:D,3,0)`)
+    btnSheet.getRange("H2").setFormula(`=I2#&" "&"Mobile Application Parking PBP"&" "&F2#`)
+    btnSheet.getRange("I2").setFormula(`=VLOOKUP(TEXT(B2:B${endrow},0),'[##MASTER STATION LIST##]Station list'!B:F,5,0)`)
+    btnSheet.getRange("J2").setFormula(`=H2#`)
+    btnSheet.getRange("K2").setFormula(`=VLOOKUP(TEXT(C2:C${endrow},0),'[##MASTER PROD VALUE LIST##]Production Values'!$A:$H,7,FALSE)`)
+    btnSheet.getRange("L2").setFormula(`=(0*C2:C${endrow})+1`)
+    btnSheet.getRange("M2").setFormula(`=REPLACE(L2#,1,1,"PBP")`)
+    btnSheet.getRange("N2").setFormula(`=D2:D${endrow}`)
+    btnSheet.getRange("O2").setFormula(`=VLOOKUP(TEXT(C2:C${endrow},0),'[##MASTER PROD VALUE LIST##]Production Values'!A:G,5,0) & " " & E2:E${endrow} & " " & I2# & " " & F2# & " 5"`)
+
+    // format time
+    btnSheet.getRange("1:1").getFormat().getFont().setBold(true)
+    btnSheet.getRange("F:O").getFormat().getFill().setColor("FFF2CC")
+    btnSheet.getRange("F1:O1").getFormat().getFill().setColor("FFC000")
+    btnSheet.getRange("D:D").setNumberFormat("$#,##0.00")
+    
+    // 09. add sumifs to calc sheet per company
+    pivSheet.getRange("L2:M5").setFormulas([["co05", "=SUMIFS('Output Template'!D:D,'Output Template'!G:G, 5)"], ["co11", "=SUMIFS('Output Template'!D:D,'Output Template'!G:G, 11)"], ["co12", "=SUMIFS('Output Template'!D:D,'Output Template'!G:G, 12)"], ["co11+12", "=M3+M4"]])
+    pivSheet.getRange("M2:M5").setNumberFormat("#,##0.00")
+
+    btnSheet.setPosition(pivSheet.getPosition() + 1)
+    btnSheet.getRange("A:O").getFormat().autofitColumns()
+    btnSheet.getAutoFilter().apply("A:O")
+    // this just looks nicer
+    btnSheet.getRange("A:D").getFormat().setColumnWidth(btnSheet.getRange("F1").getWidth() * 0.75)
+    btnSheet.getFreezePanes().freezeRows(1)
+
+    // 10. present to user for validation
+
+}
