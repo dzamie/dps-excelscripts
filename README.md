@@ -62,6 +62,10 @@ Combines and processes WSS disbursement report and credit card report files, the
 
 Combines a number of similarly-named csv files into one file, for easier uploading. These files often need to be uploaded in batches, but the uploader only accepts one file per submission, so this saves time and mouse travel distance.
 
+### Startup
+
+First part of a daily process after logging in. Opens several work-necessary programs, such as web logins, Outlook, Excel, and the AHK Manager. Then triggers Startup AHK to finish the process.
+
 ### WSS create and open
 
 Creates copies of template files and opens them all in one go. There is a short delay between each opening to avoid "Excel cannot open a file while a dialog box is open" errors caused by the computer being slow to load each file. It used to have to be much longer before an upgrade.
@@ -77,16 +81,29 @@ It used to rely on user input and self-edit rather than use an external resource
 
 ## AutoHotKey
 
-### ahk manager
+### AHK Manager
 
 Helpful script to save bits of effort here and there. Features include:
 * remaps the Dedicated Copilot Key (ugh) back to the context menu it used to be on better keyboards
-* remaps predictable, repetitive mouseclicks during my many, *many* csv uploads to simple taps of the numpad+ key
-* remaps filling out predictable forms, taking screenshots, and saving screenshots, for check refunds to simple taps of the numpad+ key, and adds a "jump to step" dialog box on alt+numpad+
-* maps common strings for permit refunds to simple key combinations, saving hundreds - and sometimes thousands - of keypresses a day
+* organizes several shortcut modes for different tasks, letting the same key (usually numpad+) be used for different things at different times:
+  * maps predictable, repetitive mouseclicks during my many, *many* csv uploads to simple taps of the numpad+ key
+  * maps filling out predictable forms, taking screenshots, and saving screenshots, for check refunds to simple taps of the numpad+ key, and adds a "jump to step" dialog box on alt+numpad+
+  * maps common strings for permit refunds to simple key combinations, saving hundreds - and sometimes thousands - of keypresses a day
+  * maps predictable screenshots, copies, and close-tabs to a few key combinations for Journal Entry recording, saving a handful of keypresses and a lot of mouse distance
+  * uses Edge's console and a JS script to automatically select items in a form according to a few filters
+ 
+### Startup AHK
+
+Second part of a daily process after logging in. Logs in to two websites, manages window focus, and then watches for new mail before triggering WSS Full Starter.
 
 ## Visual Basic
 
 ### AutoMail
 
 Simple email template that lets me set a date to include in it. Used for sending bank sheets, sets up a good bit faster than copy/pasting from Sent Items, and requires less mouse precision/ctrl+arrows to fix the dates. Easily adapted to similar but different emails: just change the recipients and body. Still need to attach and send by hand, but it's honestly easier and faster to use the "recent files" part of Outlook's Attach File dropdown, and sending by hand lets me double-check in case something goes wrong.
+
+## JavaScript
+
+### Gravity Helper
+
+Defines a few functions useful for automatically finding and selecting Cash Sales in a Deposits form, based on their overhead string and their date. Also contains similar code, but outside of a function, as a more readable format of the JS script found in the Gravity Helper section of AHK Manager.
