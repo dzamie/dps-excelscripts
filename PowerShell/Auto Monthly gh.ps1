@@ -1,4 +1,6 @@
 $testmode = $false
+$testfile = "[test transaction csv]"
+$companyList = "[station-company ref file]"
 
 function Test-Out {
   param([String] $message)
@@ -19,9 +21,9 @@ function Test-Out {
 # sum each group's Amount
 # highlight (Sale sum - Refund sum) per-spreedly/company
 
-$companyFile = "[STATION/COMPANY REF PATH]"
+
 Test-Out "Importing Station list..."
-$colist = Import-Excel $companyFile -EndColumn 3
+$colist = Import-Excel $companyList -EndColumn 3
 Test-Out "List imported. Creating lookup..."
 $colookup = @{}
 $colist | ForEach-Object {
@@ -30,7 +32,7 @@ $colist | ForEach-Object {
 Test-Out "Lookup created."
 
 if($testmode) {
-  $infile = Get-Item "[TEST FILE PATH]"
+  $infile = Get-Item $testfile
 } else {
   $infile = Get-Item (Read-Host "Drag in Transaction file").Replace('"', '')
 }
@@ -72,6 +74,7 @@ $raw | ForEach-Object {
   (-not (($_."Type" -eq "Refund") -and ($_."Method" -eq "Offline")))) {
     $recCount ++
     $temp = $_
+    $temp.Location = ([String]$temp.Location).trim()
     $temp | Add-Member -MemberType NoteProperty -Name "Company" -Value ($colookup[[String]$temp.Location])
     if($temp.Company.Length -lt 2) {
       $temp.Company = "0" + $temp.Company
@@ -83,7 +86,14 @@ $raw | ForEach-Object {
     }
     $key  = (Get-Date $temp.Date -Format "MM/dd") + " "
     $key += $temp.Type.Substring(0,4) + " "
-    $key += $temp.Method.Substring(0,3) + " "
+    if($temp.Method -match "On") {
+      $key += "Onl "
+    } elseif (($temp."Check #").Length -gt 0) {
+      $key += "Chk "
+    } else {
+      $key += "ACH "
+    }
+    # $key += $temp.Method.Substring(0,3) + " "
     $key += $temp.Company + " "
     $key += $temp.'Spreedly Merchant Account'
     if($groups.ContainsKey($key)) {
@@ -122,7 +132,7 @@ foreach($key in $keylist) {
       $recordsums += @([PSCustomObject]@{
         "Date" = Get-Date $key.Substring(0,5) -Format "M/d/yyyy"
         "Company" = $key.Substring(15,2)
-        "Method" = $groups[$key][0].Method
+        "Method" = if($key.Substring(11,3) -match "Onl") { "Online" } elseif($key.Substring(11,3) -match "Chk") { "Check" } else { "ACH" }
         "Spreedly" = $key.Substring(18)
         "Sum" = $sum - $refu
       })
@@ -131,7 +141,7 @@ foreach($key in $keylist) {
     $recordsums += @([PSCustomObject]@{
       "Date" = Get-Date $key.Substring(0,5) -Format "M/d/yyyy"
       "Company" = $key.Substring(15,2)
-      "Method" = $groups[$key][0].Method
+      "Method" = if($key.Substring(11,3) -match "Onl") { "Online" } elseif($key.Substring(11,3) -match "Chk") { "Check" } else { "ACH" }
       "Spreedly" = $key.Substring(18)
       "Sum" = if($key[6] -eq "S") { $sum } else { -$sum }
     })
@@ -156,7 +166,8 @@ $groups.Keys | Where-Object {$_ -match "Refu"} | ForEach-Object {
 if($refunds.Count -gt 0) {
   $refunds | Export-Excel $outfile -WorksheetName "Refunds"
 }
-$outrecords.Keys | ForEach-Object {
+$sortedDates = @($outrecords.Keys) | Sort-Object
+$sortedDates | ForEach-Object {
   $outrecords[$_] | Export-Excel $outfile -WorksheetName ($_.replace("/","."))
 }
 
@@ -167,10 +178,10 @@ $outbook = $recordsums | Export-Excel $outfile -WorksheetName "Summary" -AutoSiz
 # use on cols K:O, T:AE
 # and col E on summary
 $outbook.Workbook.Worksheets | ForEach-Object {
-  Set-ExcelRange -Worksheet $_ -range "A:AE" -FontName "Aptos Narrow" # just looks better tbh
+  Set-ExcelRange -Worksheet $_ -range "A:AE" -FontName "Aptos Narrow"
   Set-ExcelRange -Worksheet $_ -Range "K:O" -NumberFormat "$#,##0.00_);[Red]($#,##0.00)"
   Set-ExcelRange -Worksheet $_ -Range "T:AE" -NumberFormat "$#,##0.00_);[Red]($#,##0.00)"
-  Set-ExcelRange -Worksheet $_ -Range "L:L" -AutoSize # avoid ###### visuals
+  Set-ExcelRange -Worksheet $_ -Range "L:L" -AutoSize
 }
 Set-ExcelRange -Worksheet $outbook.Workbook.Worksheets["Summary"] -Range "E:E" -NumberFormat "$#,##0.00_);[Red]($#,##0.00)" -AutoSize
 
