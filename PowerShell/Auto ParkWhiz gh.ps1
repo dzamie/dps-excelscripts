@@ -87,9 +87,32 @@ function CoLookup {
 # }
 
 if($testmode) {
-  $infile = Get-Item "[TEST FILE PATH]"
+  $infile = Get-Item $testfile
 } else {
   $infile = Get-Item (Read-Host "Drag in report file").Replace('"', '')
+}
+
+# Single day: "STP ACH transactions for Aug 20.xlsx"
+# Multi-day : "STP ACH transactions for Aug 21-23.xlsx"
+# Multimonth: "STP ACH transactions for Dec 31 - Jan 02.xlsx"
+# (\w+ ?\d+)( ?- ?(\d+))?
+# if multimonth, 2 matches with "Month XX" as Value
+# else, group [1] holds "Month XX"
+# if multiday, group [3] holds "YY", else [3].success is false
+$dateMatch = $infile.Name | Select-String -AllMatches -Pattern "(\w+ ?\d+)( ?- ?(\d+))?"
+if($dateMatch.Matches.Count -eq 2) {
+  # multimonth
+  $startDate = Get-Date ($dateMatch.Matches[0].Value)
+  $endDate = Get-Date ($dateMatch.Matches[1].Value)
+  if($startDate -gt $endDate) {
+    $startDate = $startDate.AddYears(-1) # when crossing a year boundary, startdate should be from *last* year
+  }
+} elseif ($dateMatch.Matches[0].Groups[2].Success) {
+  $startDate = Get-Date ($dateMatch.Matches[0].Groups[1].Value)
+  $endDate = Get-Date -Date $startDate -Day ($dateMatch.Matches[0].Groups[3].Value)
+} else {
+  $startDate = Get-Date ($dateMatch.Matches[0].Value)
+  $endDate = $startDate
 }
 
 Write-Output "Importing reports..."
@@ -98,6 +121,12 @@ Write-Output "Reports imported! Found $($reports.Count) reports!"
 $cali = @()
 $noncali = @()
 $errReports = @()
+$caliDates = @{}
+$nonCaliDates = @{}
+for($i = $startDate; $i -le $endDate; $i = $i.AddDays(1)) {
+  $caliDates[$i.ToShortDateString()] = @()
+  $nonCaliDates[$i.ToShortDateString()] = @()
+}
 
 $NAReports = @()
 $totalcheck = [ordered]@{
@@ -110,6 +139,9 @@ $totalcheck = [ordered]@{
 $lastcheck = 0
 
 foreach($trans in $reports) {
+  if($trans."Sum Net" -eq 0) {
+    continue # skip 0-transactions, don't add them to anything
+  }
   $percentage = 100 * ($cali.Count + $noncali.Count) / $reports.Count
   $percentage = [math]::Round($percentage, 0)
   if((($percentage % 5) -eq 0) -and $percentage -ne $lastcheck) { Write-Output "Finished $($percentage)% of reports."; $lastcheck = $percentage }
@@ -145,6 +177,14 @@ foreach($trans in $reports) {
     }
 
     $cali += $trans
+    # addseconds is needed because translating between excel's and powershell's date systems sucks
+    for($i = $startDate; $i -le $endDate; $i = $i.AddDays(1)) {
+      # using -le so that the first day absorbs all previous days (e.g. refunds)
+      if((get-date "dec 30, 1899").AddDays($trans."Post Time").AddSeconds(1).Date -le $i.Date) {
+        $caliDates[$i.ToShortDateString()] += $trans
+        break
+      }
+    }
   } else {
     # 0. if round(buyer+list-base, 2) == .48, base = list + buyer
     if([math]::Round($trans."Sum Total Buyer Fee" + $trans."Sum List Price" - $trans."Sum Base Price Original", 2) -eq 0.48) {
@@ -166,6 +206,14 @@ foreach($trans in $reports) {
     }
 
     $noncali += $trans
+    # addseconds is needed because translating between excel's and powershell's date systems sucks
+    for($i = $startDate; $i -le $endDate; $i = $i.AddDays(1)) {
+      # using -le so that the first day absorbs all previous days (e.g. refunds)
+      if((get-date "dec 30, 1899").AddDays($trans."Post Time").AddSeconds(1).Date -le $i.Date) {
+        $nonCaliDates[$i.ToShortDateString()] += $trans
+        break
+      }
+    }
   }
 }
 
@@ -182,6 +230,14 @@ if(Test-Path $outfile) {
   Remove-Item $outfile # avoid weird overlaps, since apparently it doesn't completely overwrite all the time
 }
 
+# make per-day tabs for CA/Non-CA for easier copy/paste
+for($i = $startDate; $i -le $endDate; $i = $i.AddDays(1)) {
+  $caliDates[$i.ToShortDateString()] | Export-Excel $outfile -WorksheetName ("CA " + $i.ToShortDateString().Replace("/","."))
+}
+for($i = $startDate; $i -le $endDate; $i = $i.AddDays(1)) {
+  $nonCaliDates[$i.ToShortDateString()] | Export-Excel $outfile -WorksheetName ("Non-CA " + $i.ToShortDateString().Replace("/","."))
+}
+
 $cali | Export-Excel $outfile -WorksheetName "CA"
 $noncali | Export-Excel $outfile -WorksheetName "Non-CA"
 if($errReports.count -gt 0) {
@@ -190,4 +246,8 @@ if($errReports.count -gt 0) {
 if($NAReports.count -gt 0) {
   $NAReports | Export-Excel $outfile -WorksheetName "Missing Station"
 }
-$sumout | Export-Excel $outfile -WorksheetName "Summary" -MoveToStart -Numberformat "$#,##0.00" -AutoSize -Show
+$outbook = $sumout | Export-Excel $outfile -WorksheetName "Summary" -MoveToStart -Numberformat "$#,##0.00" -AutoSize -PassThru
+foreach($sheet in $outbook.Workbook.Worksheets) {
+  Set-ExcelColumn -Worksheet $sheet -Column 4 -NumberFormat "MM/dd/yyyy" -AutoSize
+}
+Export-Excel -ExcelPackage $outbook -Show # adds a blank Sheet1 to the end but it's harmless
