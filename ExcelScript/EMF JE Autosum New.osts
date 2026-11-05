@@ -1,0 +1,264 @@
+/* JE info block:
+ * - starts on A/I/N/S
+ * - 5 col wide
+ * - extendrange down tall
+ * - name in col 2, date in col 3, value in col 5
+ * 
+ * Target:
+ * - remove col 1
+ * - CC/Echeck/Corp separated up at [col]3
+ * - categories separated by type, then by pos/neg, with sum at end
+ * - categories start at [col]9, separated by 1 blank row after prev's sum
+ * - summary: F9... has 4-digit code, G9... has corresponding sum
+ * - summary stations separated by 1 blank row
+ * - W3:AB... has EMF JE template lines
+ * - Date, Station, Coding, Debit, Credit, Memo
+ * 
+ * Procedure:
+ * Apparently I can't use Maps because .osts won't iterate over Iterables
+ * and for SOME REASON, [map].forEach() created a race condition
+ * HOW?!?!? You're not even asynchronous!
+//  00. Set up placeholder date
+//  01. Set up station -> coding -> sum map
+//  02. ForEach station:
+//    00. Skip if column.getUsedRange(valuesonly=true) is undefined
+//    01. Get resized range (no row change, +4 col change), assign to var
+//    02. Read values into array[array]
+//    03. If date is still placeholder, overwrite with correct date
+//    04. Set up coding -> records map
+//    05. Foreach row in array, sort row.slice(1) based on row[1].contains:
+//      - "WSS" -> 1804+/-
+//      - "Call Center" -> 2400+/-
+//      - "Mail" -> 3010+/-
+//      - "WebSelfStorage" -> 3015+/-
+//      - "Internet Customer" -> 4003+/-
+//      - default -> 0
+//    06. Set up processed-records array
+//    07. Foreach nonempty coding:
+//      - calculate sum, put into sum map
+//      - append records to processed array
+//      - append [,,,sum], [,,,] to processed array
+//    08. Clear resized range
+//    09. Write records-default to [row]3
+//    10. Write processed-records to [row]9
+//    11. Prune sum map[station] of empty codes/station
+//  03. If date is still placeholder, exit.
+//  04. Set up processed-sums array, EMF JE array
+//  05. Foreach station in sum map:
+//    00. Read worksheet name, station to set Station, Bank, Memo
+//    01. Foreach code in sum map[station]:
+//      00. Add [code, sum] to processed-sums
+//      01. Add two lines to EMF JE array:
+//        - [Date][Station][Code][abs if -][abs if +][Memo]
+//        - [Date][   0   ][Bank][abs if +][abs if -][Memo]
+//  06. Write processed-sums to F9
+//  07. Write EMF JE array to W3
+//  08. Select W3:AB3.KeyboardDown
+ */
+
+type CellVal = (string | number | boolean)
+
+
+function main(workbook: ExcelScript.Workbook) {
+    // Get the active worksheet
+    let currSheet = workbook.getActiveWorksheet();
+
+    //00. Set up placeholder date
+    let date: string = undefined
+    const findStrs = {
+        "1804": "wss",
+        "2400": "call center",
+        "3010": "mail",
+        "3015": "webselfstorage",
+        "4003": "internet customer"
+    }
+    const statCols = ["A", "I", "N", "S"]
+
+    //01. Set up station -> coding -> sum map
+    let sumMap: {[col: string]: {[code: string]: number}} = {}
+
+    //02. ForEach station:
+    for(const col of statCols) {
+        //00. Skip if column.getUsedRange(valuesonly=true) is undefined
+        let oldRange = currSheet.getRange(`${col}:${col}`).getUsedRange(true)
+        if(oldRange == undefined) {
+            continue
+        }
+
+        //01. Get resized range (no row change, +4 col change), assign to var
+        oldRange = oldRange.getResizedRange(0, 4)
+
+        //02. Read values into array[array]
+        let fullRecs = oldRange.getResizedRange(0,-1).getOffsetRange(0,1).getValues()
+
+        //03. If date is still placeholder, overwrite with correct date
+        if(date == undefined) {
+            date = (new Date(<string>fullRecs[0][1])).toLocaleDateString(undefined, {month: "2-digit", day: "2-digit", year: "numeric"})
+        }
+
+        //04. Set up coding -> records map
+        let recMap: {[code: string]: CellVal[][]} = {}
+
+        //05. Foreach row in array:
+        for(const row of fullRecs) {
+            //00. sort row based on row[0].contains:
+            //- "WSS" -> 1804+/-
+            //- "Call Center" -> 2400+/-
+            //- "Mail" -> 3010+/-
+            //- "WebSelfStorage" -> 3015+/-
+            //- "Internet Customer" -> 4003+/-
+            //- default -> 0
+            let found = false
+            for(const code of Object.keys(findStrs)) {
+                if((<string>row[0]).toLowerCase().includes(findStrs[code])) {
+                    found = true
+                    if(<number>row[3] > 0) {
+                        if(!((code + "+") in recMap)) {
+                            recMap[code + "+"] = []
+                        }
+                        recMap[code + "+"].push(row)
+                    } else {
+                        if(!((code + "-") in recMap)) {
+                            recMap[code + "-"] = []
+                        }
+                        recMap[code + "-"].push(row)
+                    }
+                }
+            }
+            if(!found) {
+                if(!("default" in recMap)) {
+                    recMap["default"] = []
+                }
+                recMap["default"].push(row)
+            }
+        }
+
+        //06. Set up processed-records array
+        let processedRecs: CellVal[][] = []
+
+        //07. Foreach nonempty coding:
+        for(const code of Object.keys(recMap).sort()) {
+            if(code == "default") {
+                continue
+            }
+            //- calculate sum, put into sum map
+            let sum = recMap[code].reduce((acc, row) => acc + <number>row[3], 0)
+            if(!(col in sumMap)) {
+                sumMap[col] = {}
+            }
+            sumMap[col][code] = sum
+
+            //- append records to processed array
+            for(const row of recMap[code]) {
+                processedRecs.push(row)
+            }
+            //- append [,,,sum], [,,,] to processed array
+            processedRecs.push(["","","",sum], ["","","",""])
+        }
+
+        //08. Clear resized range
+        oldRange.clear()
+
+        //09. Write records-default to [row]4
+        if("default" in recMap) {
+            currSheet.getRange(`${col}4`).getAbsoluteResizedRange(recMap["default"].length, 4).setValues(recMap["default"])
+        }
+
+        //10. Write processed-records to [row]9
+        if(processedRecs.length > 0) {
+            currSheet.getRange(`${col}9`).getAbsoluteResizedRange(processedRecs.length, 4).setValues(processedRecs)
+        }
+
+        currSheet.getRange(`${col}:${col}`).getOffsetRange(0,3).setNumberFormat("$#,##0.00;[Red]($#,##0.00)")
+
+        //11. Prune sum map[station] of empty codes/station
+        // unnecessary, properties were only added when needed
+    }
+
+    //03. If date is still placeholder, exit.
+    if(date == undefined) {
+        return
+    }
+
+    //04. Set up processed-sums array, EMF JE array
+    let processedSums: CellVal[][] = []
+    let emfJE: CellVal[][] = []
+
+    //05. Foreach station in sum map:
+    for(const col of Object.keys(sumMap)) {
+        let station = ""
+        let bank = 0
+        let memo = "WSS EMF "
+
+        //00. Read worksheet name, station to set Station, Bank, Memo
+        if(workbook.getName().includes("Spokane")) {
+            bank = 10304
+            memo += "Spokane"
+            if(col == "A") {
+                station = "B500"
+            } else {
+                station = "B600"
+            }
+        } else if(workbook.getName().includes("SLC")) {
+            bank = 10331
+            memo += "SLC"
+            if(col == "A") {
+                station = "U131"
+            } else {
+                station = "U130"
+            }
+        } else {
+            bank = 10053
+            station = "5001"
+            if(col == "A") {
+                memo += "5001"
+            } else if(col == "I") {
+                bank = 10216
+                station = "5003"
+                memo += "5003"
+            } else if(col == "N") {
+                memo += "5002"
+            } else {
+                memo += "5004"
+            }
+        }
+
+        //01. Foreach code in sum map[station]:
+        for(const code of Object.keys(sumMap[col])) {
+            let sum = sumMap[col][code]
+            //00. Add [code, sum] to processed-sums
+            processedSums.push([code.slice(0,4), sum])
+
+            //01. Add two lines to EMF JE array:
+                //- [Date][Station][Code][abs if -][abs if +][Memo]
+                //- [Date][   0   ][Bank][abs if +][abs if -][Memo]
+            emfJE.push([date,
+                        station,
+                        code.slice(0,4),
+                        (sum < 0) ? Math.abs(sum) : "",
+                        (sum < 0) ? "" : sum,
+                        memo],
+                       [date,
+                        "'0",
+                        bank,
+                        (sum < 0) ? "" : sum,
+                        (sum < 0) ? Math.abs(sum): "",
+                        memo])
+        }
+        processedSums.push(["",""])
+    }
+
+    //06. Write processed-sums to F9
+    if(processedSums.length > 0) {
+        currSheet.getRange("F9").getAbsoluteResizedRange(processedSums.length, 2).setValues(processedSums)
+        currSheet.getRange("G9").getAbsoluteResizedRange(processedSums.length, 1).setNumberFormat("$#,##0.00;[Red]($#,##0.00)")
+    }
+
+    //07. Write EMF JE array to W3
+    if(emfJE.length > 0) {
+        currSheet.getRange("W3").getAbsoluteResizedRange(emfJE.length, 6).setValues(emfJE)
+
+        //08. Select W3:AB3.KeyboardDown
+        currSheet.getRange("W3").getAbsoluteResizedRange(emfJE.length, 6).select()
+    }
+}
