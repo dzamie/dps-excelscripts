@@ -75,7 +75,7 @@ Grav_Active(Button, Info) {
   Hotkey("NumpadAdd", Grav_StatVis, "On")
   Hotkey("``", Grav_Off, "On")
   GuiBox.Hide()
-  jsScript := 'let overhead = "OHplace";let startDate = "SDplace";let endDate = "EDplace";const startHigh = ["BLV", "09801", "01904", "PAS"];let dateList = [];for(let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) { dateList.push(d.toLocaleDateString(undefined, {month: "2-digit", day: "2-digit"}));}if(! startHigh.includes(overhead)) { dateList = dateList.slice(0, -1);}for(const date of dateList) { let recordList = Array.prototype.slice.call(document.getElementsByClassName("uir-list-row-tr")); let relevantList = recordList.filter((x) => x.childNodes[4].innerHTML.includes(overhead) && x.childNodes[4].innerHTML.includes(date)); relevantList.forEach((x) => x.childNodes[0].childNodes[0].click());}'
+  jsScript := 'overhead = "OHplace";startDate = "SDplace";endDate = "EDplace";const startHigh = ["BLV", "09801", "01904", "PAS", "WX049", "WM012", "SL068"];dateList = [];for(let d = new Date(startDate); d <= new Date(endDate); d.setDate(d.getDate() + 1)) { dateList.push(d.toLocaleDateString(undefined, {month: "2-digit", day: "2-digit"}));}if(! startHigh.includes(overhead)) { dateList = dateList.slice(0, -1);}for(const date of dateList) { recordList = Array.prototype.slice.call(document.getElementsByClassName("uir-list-row-tr")); relevantList = recordList.filter((x) => x.childNodes[4].innerHTML.includes(overhead) && x.childNodes[4].innerHTML.includes(date)); relevantList.forEach((x) => x.childNodes[0].childNodes[0].click());}'
   Grav_Setup()
   return true
 }
@@ -165,22 +165,26 @@ Csv_Off(foo) {
 
 PPt_1(foo) {
   Sleep 200
-  Send "Customer cancelling permit. Refunding X Monthly Permit minus fees."
+  A_Clipboard := "Customer cancelling permit. Refunding X Monthly Permit minus fees."
+  Send "^v"
   Send "^{Left 5}"
   Send "{Left}"
   Send "{BS}"
 }
 PPt_2(foo) {
   Sleep 200
-  Send "Customer returned access device. Refunding Access Device fee."
+  A_Clipboard := "Customer returned access device. Refunding Access Device fee."
+  Send "^v"
 }
 PPt_3(foo) {
   Sleep 200
-  Send "Customer returned access device. Requesting check to refund Access Device fee."
+  A_Clipboard := "Customer returned access device. Requesting check to refund Access Device fee."
+  Send "^v"
 }
 PPt_4(foo) {
   Sleep 200
-  Send "Customer switching lots. Refunding X Monthly Permit."
+  A_Clipboard := "Customer switching lots. Refunding X Monthly Permit."
+  Send "^v"
   Send "^{Left 3}"
   Send "{Left}"
   Send "{BS}"
@@ -354,14 +358,12 @@ Chk_Step(*) {
     Send "!{F4}"
   } else if(StepCt = 8) {
     ; Bill
-    Click 87, 725, "WD", 3
+    Click 87, 725, "WU", 3
     Sleep 200
     Sleep 200
-    Click 1070, 425 ; GEO
+    Click 1070, 700 ; GEO
     Sleep 200
     Send "DPS Consolidated GEO : Consolidated Parking : US Parking : Other US Parking : WAPKS{Tab}"
-    Click 87, 725, "WU", 5
-    Sleep 200
     Sleep 200
     Click 1075, 400
     Sleep 200
@@ -388,14 +390,14 @@ Chk_Step(*) {
     Send InVars.Amount "{Tab}"
     Click 175, 448, "WD", 3
     Sleep 500
-    Click 80, 915
+    Click 80, 915 ; Add item
     Sleep 1000
-    Click 175, 448, "WD", 3
+    Click 175, 448, "WU", 4
     Sleep 200
     Sleep 200
-    Click 220, 625
+    Click 220, 780 ; Billing tab
     Sleep 200
-    Click 335, 905
+    Click 250, 920 ; Vendor Select
   } else if(StepCt = 9) {
     ; Bill screenshot
     Chk_ScreenShot(1500, 960)
@@ -546,6 +548,7 @@ Grav_SetDates(*) {
 }
 
 Grav_SetStat(GuiCtrl, *) {
+  global DateVars
   global StationBox
   StationBox.Hide()
   global jsScript
@@ -563,19 +566,60 @@ Grav_SetStat(GuiCtrl, *) {
   Sleep(1000)
   Send('^v')
   Send('{Enter}')
-  if(InStr(station, 'KNG')) {
-    A_Clipboard := StrReplace(jsScript, 'OHplace', 'UDT')
-    Sleep(1000)
-    Send('^v')
-    Send('{Enter}')
-  } else if(InStr(station, 'SAA')) {
-    A_Clipboard := StrReplace(jsScript, 'OHplace', 'LGB')
-    Sleep(1000)
-    Send('^v')
-    Send('{Enter}')
-  }
   Sleep(500)
   Send("+^j")
+  if(InStr(station, 'KNG')) {
+    A_Clipboard := StrReplace(jsScript, 'OHplace', 'UDT')
+    Sleep(500)
+    Send("+^j")
+    Sleep(1000)
+    Send('^v')
+    Send('{Enter}')
+    Sleep(500)
+    Send("+^j")
+    ; WX049 acts like it's from the next day
+    UDTScript := StrReplace(jsScript, 'OHplace', 'WX049')
+    ; give it a fake start=end set of dates to only click the "last" WX049 - prevents unselecting on multidays
+    A_Clipboard := StrReplace(UDTScript, DateVars.StartDate, DateVars.EndDate)
+    Sleep(500)
+    Send("+^j")
+    Sleep(1000)
+    Send('^v')
+    Send('{Enter}')
+    Sleep(500)
+    Send("+^j")
+  } else if(InStr(station, 'SAA')) {
+    A_Clipboard := StrReplace(jsScript, 'OHplace', 'LGB')
+    Sleep(500)
+    Send("+^j")
+    Sleep(1000)
+    Send('^v')
+    Send('{Enter}')
+    Sleep(500)
+    Send("+^j")
+    ; just like WX049
+    SAAScript := StrReplace(jsScript, 'OHplace', 'SL068')
+    A_Clipboard := StrReplace(SAAScript, DateVars.StartDate, DateVars.EndDate)
+    Sleep(500)
+    Send("+^j")
+    Sleep(1000)
+    Send('^v')
+    Send('{Enter}')
+    Sleep(500)
+    Send("+^j")
+  } else if(InStr(station, 'BLV')) {
+    ; click WM012's "high date" again to deselect it
+    BLVScript := StrReplace(jsScript, 'OHplace', 'WM012')
+    ; give it a fake start=end set of dates to only click the "last" WM012
+    A_Clipboard := StrReplace(BLVScript, DateVars.StartDate, DateVars.EndDate)
+    Sleep(500)
+    Send("+^j")
+    Sleep(1000)
+    Send('^v')
+    Send('{Enter}')
+    Sleep(500)
+    Send("+^j")
+  }
   Sleep(500)
   Send('{Home}')
 }
