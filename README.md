@@ -20,6 +20,10 @@ As above, but for the new report format. It's turning out to be a bit more troub
 
 Processes a worksheet from a log of WebSelfStorage transaction records, moves some cells around, sorts them and sums the groups, and generates a block to copy into a csv template (and selects the block for quick copying). This is tied to a button on the template log (not found here, obviously) for ease of activation.
 
+### EMF JE Autosum New
+
+Same function as EMF JE Autosum, but has more consistent output formatting, automatically detects record dates, is agnostic to the raw records' starting row, and doesn't error out if there's no data to put in the CSV template.
+
 ### Finish PBP DPS MOR
 
 Processes a report taken directly from PBP's site, using different calculations and formatting, and fills out the csv template found in the workbook. Also no longer used as of Nov. 2025.
